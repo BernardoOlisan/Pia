@@ -2,6 +2,8 @@
 
 *The philosophy behind PIA.*
 
+> Inspired by the talk [The Programming Ape](https://www.youtube.com/watch?v=e_6gkfTomUQ), by Coda Hale (Philly ETE).
+
 ## The problem
 
 Working with coding agents changed my job. I'm not touching code anymore. I'm designing. And designing with agents means reading: research documents, plans, logs, reviews. Exhaustive, detailed, well written. Hours of them.
