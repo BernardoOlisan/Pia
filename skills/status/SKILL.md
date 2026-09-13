@@ -16,4 +16,4 @@ Reply with one short table, newest first, in the human's language:
 | Work | Phase | Mode | Decisions | Awake | Now |
 |---|---|---|---|---|---|
 
-Then, only if something needs the human, one line each: works in `awaiting-review` (read their `decisions.md`), works in `test` (waiting for test feedback), and caffeinate running on a work that is waiting or done (offer to stop it).
+Then, only if something needs the human, one line each: works in `awaiting-review` (read their `decisions.md`), works in `test` (waiting for test feedback), works waiting for another work to finish implementing, and caffeinate running on a work that is waiting or done (offer to stop it).

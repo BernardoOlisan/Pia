@@ -11,21 +11,21 @@ PIA is a workflow for coding agents, packaged as a Claude Code plugin. You state
 ```
 you: /pia:new <intention>
   │
-  ├─ Intent      the lead asks you the right questions until the intention is clear
-  ├─ Research    researcher ⇄ reviewer, until nothing is missing          🤖 research.md
-  ├─ Decisions   every choice becomes a decision, already decided          👤 decisions.md
-  │              ── mode "review": stop here and wait for you
-  ├─ Plan        planner ⇄ reviewer, a literal to-do list                  🤖 plan.md
-  ├─ Implement   implementer builds it, logging as it goes                 🤖 log.md
+  ├─ Intent      the lead asks you everything it needs to understand what you want
+  ├─ Research    researcher ⇄ reviewer (both investigate), until nothing is missing   🤖 research.md
+  ├─ Decisions   every choice becomes a decision, already decided                    👤 decisions.md
+  │              ── mode "in-the-loop": stop here and wait for you
+  ├─ Plan        planner ⇄ reviewer, a literal to-do list                            🤖 plan.md
+  ├─ Implement   implementer builds it, logging as it goes                           🤖 logs/
   └─ Test        you test, give feedback, agents fix
 ```
 
-- **Agents always decide.** Each decision comes with the recommended answer already chosen and the reason. You approve or change it.
+- **Agents always decide.** Each decision comes with the recommended answer already chosen and the reason. You approve or change it. What you answer during the intent is recorded as decided by you.
 - **Decisions have permanent IDs** (`D-017`) across the whole project. Change one later and PIA shows what depends on it.
-- **Decisions have weight** (🔴 high, 🟡 medium, 🟢 low), so you read what matters first.
+- **Decisions have weight** (🔴 high, 🟡 medium, 🟢 low) and an area, so you read what matters first.
 - **Decisions are memory.** New work reads past decisions to recommend the way you'd choose.
-- **Nothing stops the work:** automatic compaction, a running log to resume from, replaceable agents.
-- **The machine stays awake** (`caffeinate -dims`) while agents work unattended.
+- **Nothing stops the work:** automatic compaction for the lead and every teammate, logs to resume from, replaceable agents.
+- **The machine stays awake** (`caffeinate -dims`) while agents work unattended, and lets go when Claude Code closes.
 
 ## A decision
 
@@ -38,7 +38,7 @@ you: /pia:new <intention>
 - **B) On the server:** identical everywhere, but needs a connection
 
 **✅ Decided: B.** The report must look the same for every client. Consistent with D-004 (online-only).
-**Depends on:** D-004 · **Affects:** plan phases 2 and 3
+**Area:** reports · **Depends on:** D-004 · **Affects:** plan phases 2 and 3
 **Status:** agent
 ```
 
@@ -57,13 +57,14 @@ For local development, from a clone: `claude --plugin-dir /path/to/Pia`.
 
 | Command | What it does |
 |---|---|
-| `/pia:init` | Set up PIA in a repo: `.pia/`, import `docs/RULES.md` as 📌 Binding decisions, point `CLAUDE.md` at PIA, enable auto-compaction (500k tokens) and agent teams. Restart Claude Code afterwards. |
+| `/pia:init` | Set up PIA in a repo: `.pia/`, import `docs/RULES.md` as 📌 Binding decisions, point `CLAUDE.md` at PIA, enable auto-compaction (600k tokens) and agent teams. Restart Claude Code afterwards. |
 | `/pia:new <intention>` | Start a work. Keeps the machine awake, clarifies the intention, runs the team. |
 | `/pia:status` | Where every work stands. |
 | `/pia:continue [work]` | Resume a work after reviewing its decisions, or in a new session. |
 | `/pia:change D-017 <answer>` | Change a decision and see its impact. |
-| `/pia:auto [work]` · `/pia:review [work]` | Don't stop / stop at the decision map. `--default` changes the project default. |
-| `/pia:compact <tokens>` | Change the auto-compaction window, e.g. `500k`. |
+| `/pia:in-the-loop [work]` | Stop at the decision map and wait for you (default). |
+| `/pia:out-of-the-loop [work]` | Don't stop; go all the way to implementation. `--default` on either changes the project default. |
+| `/pia:compact <tokens>` | Change the auto-compaction window, e.g. `600k`. |
 
 ## In your project
 
@@ -78,13 +79,16 @@ For local development, from a clone: `claude --plugin-dir /path/to/Pia`.
     ├── research.md   🤖
     ├── decisions.md  👤
     ├── plan.md       🤖
-    └── log.md        🤖
+    ├── log.md        🤖 the lead's summary
+    └── logs/         🤖 one log per agent
 ```
 
 👤 for you · 🤖 for agents
 
 ## Notes
 
-- **Unattended runs:** teammate permission prompts appear in the lead's session and would wait for you. For overnight work, start Claude Code with a permission mode that won't block, e.g. `claude --permission-mode auto`.
+- **Unattended runs:** teammate permission prompts appear in the lead's session and would wait for you. For overnight work, run Claude Code in a permission mode that won't block, e.g. `claude --permission-mode auto`.
+- **Other sessions** in a PIA project compact normally at the same window, with nothing from PIA injected.
+- **Several works at once:** fine up to the plan; only one work implements at a time.
 - **Agent teams are experimental** in Claude Code. If they're off, PIA runs the same roles as named subagents.
 - Status: early. Built in the open; expect changes.

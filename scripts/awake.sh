@@ -5,6 +5,9 @@
 #   awake.sh start  <work-dir>   run `caffeinate -dims` in the background, save its PID
 #   awake.sh stop   <work-dir>   kill that PID (only if it is still caffeinate), remove the file
 #   awake.sh status <work-dir>   show whether it is running
+#
+# When CLAUDE_PID is set (Claude Code sets it for every command), caffeinate also gets `-w CLAUDE_PID`,
+# so it exits by itself if Claude Code closes or crashes.
 set -u
 
 cmd="${1:-}"
@@ -44,10 +47,15 @@ case "$cmd" in
       echo "awake: caffeinate is not available on this system; skipping"
       exit 0
     fi
-    nohup caffeinate -dims >/dev/null 2>&1 &
+    watch=""
+    if [ -n "${CLAUDE_PID:-}" ] && ps -p "$CLAUDE_PID" >/dev/null 2>&1; then
+      watch="-w $CLAUDE_PID"
+    fi
+    # shellcheck disable=SC2086
+    nohup caffeinate -dims $watch >/dev/null 2>&1 &
     pid=$!
     echo "$pid" > "$pidfile"
-    echo "awake: started caffeinate -dims (PID $pid) → $pidfile"
+    echo "awake: started caffeinate -dims $watch (PID $pid) → $pidfile"
     ;;
   stop)
     pid="$(saved_pid)"

@@ -11,6 +11,12 @@
 **Out of scope:** {…}
 **Constraints:** {…}
 
+## Decided by the human
+
+<!-- Answers that are really decisions. Each becomes a card with Status: human in decisions.md. -->
+- {decision, in one line} (question {n})
+
 ## Clarifications
 
+### Round 1
 1. {question} → {answer}

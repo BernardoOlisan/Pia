@@ -1,5 +1,5 @@
 {
-  "description": "PIA: after a compaction, restore where the work stands",
+  "description": "PIA: restore where the work stands after compaction (PIA sessions only), and stop keep-awake when the lead's session ends",
   "hooks": {
     "SessionStart": [
       {
@@ -8,6 +8,16 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/resume-context.sh\""
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/session-end.sh\""
           }
         ]
       }

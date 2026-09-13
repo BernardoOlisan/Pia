@@ -1,2 +1,4 @@
 # Temporary keep-awake PIDs
 *.pid
+# Lock used while reserving decision IDs
+.decision-id.lock/

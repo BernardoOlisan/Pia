@@ -14,7 +14,7 @@ from pathlib import Path
 
 MIN_TOKENS = 100_000
 MAX_TOKENS = 1_000_000
-DEFAULT_TOKENS = 500_000
+DEFAULT_TOKENS = 600_000
 
 
 def parse_tokens(text):
@@ -49,7 +49,7 @@ def main():
     config_path = project / ".pia" / "config.json"
     settings_path = project / ".claude" / "settings.json"
 
-    config = read_json(config_path, {"mode": "review", "compact": DEFAULT_TOKENS})
+    config = read_json(config_path, {"mode": "in-the-loop", "compact": DEFAULT_TOKENS})
     try:
         tokens = parse_tokens(sys.argv[2] if len(sys.argv) == 3 else config.get("compact", DEFAULT_TOKENS))
     except ValueError as error:
