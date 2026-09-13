@@ -1,6 +1,6 @@
 ---
 name: change
-description: Change a PIA decision by its ID (e.g. D-017) — updates the card and project memory, and shows what depends on it.
+description: Change a PIA decision by its ID (e.g. D-017). Updates the card and project memory, and shows what depends on it.
 argument-hint: "D-NNN <new answer and why>"
 disable-model-invocation: true
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(date *)

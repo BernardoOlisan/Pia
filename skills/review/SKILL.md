@@ -1,6 +1,6 @@
 ---
 name: review
-description: Switch a PIA work to review mode — it will stop when the decision map is finished and wait for you.
+description: Switch a PIA work to review mode: it will stop when the decision map is finished and wait for you.
 argument-hint: "[work id or number] [--default]"
 disable-model-invocation: true
 allowed-tools: Read, Edit, Glob, Bash(ls *), Bash(date *)

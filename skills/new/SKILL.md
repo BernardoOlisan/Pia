@@ -1,12 +1,12 @@
 ---
 name: new
-description: Start a new PIA work from an intention — keep the machine awake, clarify the intention with the human, then lead a team of agents through research, decisions, plan and implementation.
+description: Start a new PIA work from an intention: keep the machine awake, clarify the intention with the human, then lead a team of agents through research, decisions, plan and implementation.
 argument-hint: "<your intention>"
 disable-model-invocation: true
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls *), Bash(mkdir -p *), Bash(date *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/awake.sh" *)
 ---
 
-# /pia:new — you are the PIA lead
+# /pia:new (you are the PIA lead)
 
 **Intention from the human:**
 
@@ -14,9 +14,9 @@ $ARGUMENTS
 
 If `.pia/PIA.md` doesn't exist, tell the human to run `/pia:init` first, and stop.
 
-Read `.pia/PIA.md` completely now — it is the source of truth for everything below. Then read `.pia/DECISIONS.md` and `.pia/config.json`.
+Read `.pia/PIA.md` completely now; it is the source of truth for everything below. Then read `.pia/DECISIONS.md` and `.pia/config.json`.
 
-## 1. Create the work and keep the machine awake — first, always
+## 1. Create the work and keep the machine awake (first, always)
 
 1. Pick the id: next number in `.pia/work/` (`001`, `002`, …) plus a short kebab-case slug of the intention, e.g. `003-export-reports-pdf`.
 2. `mkdir -p .pia/work/<id>`.
@@ -34,12 +34,12 @@ Ask one numbered batch of short questions, in the human's language, each with a 
 
 Tell the human in one line that you're starting, and which mode is on (and that they can switch it with `/pia:auto` or `/pia:review`).
 
-## 3. Lead the team (PIA.md → Team, Phases 2–6)
+## 3. Lead the team (PIA.md → Team, Phases 2 to 6)
 
 Spawn teammates with the Agent tool, **always passing a `name`** (with agent teams enabled, that makes them teammates; otherwise they run as named subagents). Use this spawn prompt, filled in:
 
 > You are the PIA **{role}** for work **{id}** in this repository. Work folder: `.pia/work/{id}/`. You talk to: {names}, and the lead.
-> First read `.pia/PIA.md` — sections "All agents", "Team", and {your sections} — then `CLAUDE.md`, `.pia/DECISIONS.md`, and the work's `state.json` and `intent.md`. Then do your job exactly as described there. Communicate only with SendMessage. Templates for work files are in `${CLAUDE_PLUGIN_ROOT}/templates/work/`.
+> First read `.pia/PIA.md` (sections "All agents", "Team", and {your sections}), then `CLAUDE.md`, `.pia/DECISIONS.md`, and the work's `state.json` and `intent.md`. Then do your job exactly as described there. Communicate only with SendMessage. Templates for work files are in `${CLAUDE_PLUGIN_ROOT}/templates/work/`.
 
 | Phase | Spawn | Their sections |
 |---|---|---|

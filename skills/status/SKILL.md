@@ -1,6 +1,6 @@
 ---
 name: status
-description: Show where every PIA work in this project stands — phase, mode, decisions by weight, keep-awake, and what's happening now.
+description: Show where every PIA work in this project stands: phase, mode, decisions by weight, keep-awake, and what's happening now.
 argument-hint: "[work id or number]"
 allowed-tools: Read, Glob, Grep, Bash(ls *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/awake.sh" *)
 ---

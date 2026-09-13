@@ -41,12 +41,12 @@ print_work() {
   dir="$(dirname "$state")"
   id="$(basename "$dir")"
   echo
-  echo "### Work $id — $(field "$state" title)"
+  echo "### Work $id: $(field "$state" title)"
   echo "phase: $(field "$state" phase) · mode: $(field "$state" mode) · folder: .pia/work/$id"
   now_section "$dir/log.md"
 }
 
-echo "PIA — context restored after compaction."
+echo "PIA: context restored after compaction."
 echo "Before doing anything else: re-read .pia/PIA.md (\"All agents\" and your phase sections), then state.json and the \"## Now\" section of log.md for your work."
 
 if [ -n "$mine" ]; then

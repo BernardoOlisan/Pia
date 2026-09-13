@@ -4,7 +4,7 @@
     "name": "Bernardo Olisan",
     "url": "https://github.com/BernardoOlisan"
   },
-  "description": "PIA — Decision Driven Development for coding agents.",
+  "description": "PIA: Decision Driven Development for coding agents.",
   "plugins": [
     {
       "name": "pia",

@@ -1,4 +1,4 @@
-# Plan — {work title}
+# Plan: {work title}
 
 > For agents. Built from research.md and decisions.md. No new decisions.
 > Progressive disclosure: *At a glance* first, detail inside `<details>`.
@@ -15,10 +15,10 @@
 
 </details>
 
-## Phase 1 — {name}
+## Phase 1: {name}
 {one-line summary}
 
-- [ ] 1.1 {step} — files: {…} [D-NNN]
+- [ ] 1.1 {step} · files: {…} [D-NNN]
 
 <details><summary>Detail</summary>
 
@@ -28,9 +28,9 @@
 
 **Tests:** {what to run, what must pass}
 
-## Phase 2 — {name}
+## Phase 2: {name}
 {one-line summary}
 
-- [ ] 2.1 {step} — files: {…} [D-NNN]
+- [ ] 2.1 {step} · files: {…} [D-NNN]
 
 **Tests:** {…}

@@ -1,4 +1,4 @@
-# Log — {work id}
+# Log: {work id}
 
 ## Now
 - **Phase:** intent

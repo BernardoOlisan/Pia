@@ -1,6 +1,6 @@
 ---
 name: auto
-description: Switch a PIA work to auto mode — it won't stop after the decision map and keeps going through plan and implementation (e.g. while you sleep).
+description: Switch a PIA work to auto mode: it won't stop after the decision map and keeps going through plan and implementation (e.g. while you sleep).
 argument-hint: "[work id or number] [--default]"
 disable-model-invocation: true
 allowed-tools: Read, Edit, Glob, Bash(ls *), Bash(date *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/awake.sh" *)

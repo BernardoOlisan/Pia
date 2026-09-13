@@ -1,6 +1,6 @@
-# Research — {work title}
+# Research: {work title}
 
-> For agents: exhaustive by design. No open questions — every open point becomes a decision.
+> For agents: exhaustive by design. No open questions: every open point becomes a decision.
 > Progressive disclosure: *At a glance* first, a one-line summary per section, deep detail inside `<details>`.
 
 ## At a glance
@@ -9,7 +9,7 @@
 ## 1. Intent recap
 {one-line summary}
 
-## 2. Current state — how it really works today
+## 2. Current state: how it really works today
 {one-line summary}
 
 <details><summary>Detail</summary>

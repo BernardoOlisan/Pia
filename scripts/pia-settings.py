@@ -24,7 +24,7 @@ def parse_tokens(text):
     number, unit = float(match.group(1)), match.group(2)
     tokens = int(number * {"": 1, "k": 1_000, "m": 1_000_000}[unit])
     if not MIN_TOKENS <= tokens <= MAX_TOKENS:
-        raise ValueError(f"{tokens} tokens is outside the allowed range (100k–1M)")
+        raise ValueError(f"{tokens} tokens is outside the allowed range (100k to 1M)")
     return tokens
 
 

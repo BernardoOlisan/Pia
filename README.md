@@ -2,7 +2,7 @@
 
 **Decision Driven Development (DDD).** A good agentic system, given an intention, resources and context, should work for hours, even all night. Your attention goes only to the decisions.
 
-PIA is a workflow for coding agents, packaged as a Claude Code plugin. You state an **intention**. Agents clarify it with you, then research, decide, plan and build — reviewing each other along the way. They write long, exhaustive documents for themselves. You read one thing: a **decision map**.
+PIA is a workflow for coding agents, packaged as a Claude Code plugin. You state an **intention**. Agents clarify it with you, then research, decide, plan and build, reviewing each other along the way. They write long, exhaustive documents for themselves. You read one thing: a **decision map**.
 
 → Why: [PHILOSOPHY.md](PHILOSOPHY.md)
 
@@ -22,7 +22,7 @@ you: /pia:new <intention>
 
 - **Agents always decide.** Each decision comes with the recommended answer already chosen and the reason. You approve or change it.
 - **Decisions have permanent IDs** (`D-017`) across the whole project. Change one later and PIA shows what depends on it.
-- **Decisions have weight** — 🔴 high, 🟡 medium, 🟢 low — so you read what matters first.
+- **Decisions have weight** (🔴 high, 🟡 medium, 🟢 low), so you read what matters first.
 - **Decisions are memory.** New work reads past decisions to recommend the way you'd choose.
 - **Nothing stops the work:** automatic compaction, a running log to resume from, replaceable agents.
 - **The machine stays awake** (`caffeinate -dims`) while agents work unattended.
@@ -34,10 +34,10 @@ you: /pia:new <intention>
 
 **Context:** Reports can be exported as PDF. The PDF can be drawn on the phone or on the server.
 
-- **A) On the phone** — works offline, but each device renders it slightly differently
-- **B) On the server** — identical everywhere, but needs a connection
+- **A) On the phone:** works offline, but each device renders it slightly differently
+- **B) On the server:** identical everywhere, but needs a connection
 
-**✅ Decided: B** — the report must look the same for every client. Consistent with D-004 (online-only).
+**✅ Decided: B.** The report must look the same for every client. Consistent with D-004 (online-only).
 **Depends on:** D-004 · **Affects:** plan phases 2 and 3
 **Status:** agent
 ```
@@ -60,7 +60,7 @@ For local development, from a clone: `claude --plugin-dir /path/to/Pia`.
 | `/pia:init` | Set up PIA in a repo: `.pia/`, import `docs/RULES.md` as 📌 Binding decisions, point `CLAUDE.md` at PIA, enable auto-compaction (500k tokens) and agent teams. Restart Claude Code afterwards. |
 | `/pia:new <intention>` | Start a work. Keeps the machine awake, clarifies the intention, runs the team. |
 | `/pia:status` | Where every work stands. |
-| `/pia:continue [work]` | Resume a work — after reviewing its decisions, or in a new session. |
+| `/pia:continue [work]` | Resume a work after reviewing its decisions, or in a new session. |
 | `/pia:change D-017 <answer>` | Change a decision and see its impact. |
 | `/pia:auto [work]` · `/pia:review [work]` | Don't stop / stop at the decision map. `--default` changes the project default. |
 | `/pia:compact <tokens>` | Change the auto-compaction window, e.g. `500k`. |
