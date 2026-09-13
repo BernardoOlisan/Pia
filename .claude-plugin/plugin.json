@@ -1,0 +1,12 @@
+{
+  "name": "pia",
+  "displayName": "PIA",
+  "description": "PIA: Decision Driven Development (DDD). A good agentic system, given an intention, resources and context, should work for hours, even all night. Your attention goes only to the decisions.",
+  "author": {
+    "name": "Bernardo Olisan",
+    "url": "https://github.com/BernardoOlisan"
+  },
+  "homepage": "https://github.com/BernardoOlisan/Pia",
+  "repository": "https://github.com/BernardoOlisan/Pia",
+  "keywords": ["decision-driven-development", "ddd", "agents", "agent-teams", "workflow", "research", "planning"]
+}

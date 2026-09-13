@@ -1,0 +1,15 @@
+{
+  "name": "pia",
+  "owner": {
+    "name": "Bernardo Olisan",
+    "url": "https://github.com/BernardoOlisan"
+  },
+  "description": "PIA — Decision Driven Development for coding agents.",
+  "plugins": [
+    {
+      "name": "pia",
+      "source": "./",
+      "description": "PIA: Decision Driven Development (DDD). State an intention; agents research, decide, plan and build. Your attention goes only to the decisions."
+    }
+  ]
+}

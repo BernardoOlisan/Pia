@@ -1,0 +1,16 @@
+{
+  "description": "PIA: after a compaction, restore where the work stands",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/resume-context.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}
