@@ -68,6 +68,20 @@ For local development, from a clone: `claude --plugin-dir /path/to/Pia`.
 | `/pia:out-of-the-loop [work]` | Don't stop; go all the way to implementation. `--default` on either changes the project default. |
 | `/pia:compact <tokens>` | Change the auto-compaction window, e.g. `600k`. |
 
+### Dictation cost
+
+The notch shows what dictation has cost this month (`gpt-transcribe`, $0.0045 per minute). It starts again at `$0.000` every month. To reset it sooner, stop the dictation process and delete its ledger:
+
+```
+pkill -f "pia-voice dictate serve"; rm -f ~/Library/Application\ Support/PIA\ Voice/dictation.json
+```
+
+The process keeps the total in memory, so deleting the file alone isn't enough. It starts again with Claude Code, or right away (already recording) with `/pia:transcribe`. As an alias, in `~/.zshrc`:
+
+```
+alias pia-transcribe-reset='pkill -f "pia-voice dictate serve"; rm -f ~/Library/Application\ Support/PIA\ Voice/dictation.json && echo "PIA Transcribe: cost reset to \$0.000"'
+```
+
 ## In your project
 
 ```
