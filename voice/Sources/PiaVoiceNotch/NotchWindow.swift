@@ -23,31 +23,47 @@ final class NotchPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-/// Shows the notch island for as long as pia-voice runs.
+/// Shows the notch island: the whole time for the intent, only while dictating for transcribe.
 @MainActor
 public final class NotchWindow {
     private let panel: NotchPanel
+    private let leftContentWidth: CGFloat
     private var observer: Any?
 
-    public init(model: NotchModel) {
+    public convenience init(model: NotchModel) {
         let geometry = NotchGeometry.current()
-        let host = NSHostingView(rootView: NotchView(model: model, geometry: geometry))
+        self.init(root: NotchView(model: model, geometry: geometry), leftContentWidth: geometry.leftContentWidth)
+    }
+
+    public convenience init(dictation model: DictationModel) {
+        let geometry = NotchGeometry.current(leftContentWidth: DictationView.leftContentWidth)
+        self.init(root: DictationView(model: model, geometry: geometry), leftContentWidth: geometry.leftContentWidth)
+    }
+
+    private init(root: some View, leftContentWidth: CGFloat) {
+        self.leftContentWidth = leftContentWidth
+        let host = NSHostingView(rootView: root)
         host.safeAreaRegions = []
         panel = NotchPanel(content: host)
-        panel.setFrame(geometry.stageFrame, display: true)
+        panel.setFrame(NotchGeometry.current(leftContentWidth: leftContentWidth).stageFrame, display: true)
     }
 
     public func show() {
         panel.orderFrontRegardless()
+        guard observer == nil else { return }
         observer = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.panel.setFrame(NotchGeometry.current().stageFrame, display: true) }
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.panel.setFrame(NotchGeometry.current(leftContentWidth: self.leftContentWidth).stageFrame, display: true)
+            }
         }
     }
 
     public func hide() {
         if let observer { NotificationCenter.default.removeObserver(observer) }
+        observer = nil
         panel.orderOut(nil)
     }
 }

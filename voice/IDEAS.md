@@ -6,6 +6,8 @@ Voice is an optional feature, not the core. PIA works exactly the same without i
 
 Status: feature 1 is built (`/pia:new --voice`, Swift package in this folder). Features 2 and 3 are written down so they aren't lost.
 
+Also built, apart from PIA: **dictation** (`/pia:transcribe` or ⌥Space). `pia-voice dictate serve` runs while Claude Code is open (started by a SessionStart hook), records to .m4a, transcribes with `gpt-transcribe` ($0.0045/min) and copies the text to the clipboard. The notch shows a red dot while recording and this month's cost. A `UserPromptExpansion` hook blocks `/pia:transcribe` with exit 2, so Claude never sees it. Change the shortcut with `PIA_TRANSCRIBE_HOTKEY` (e.g. `ctrl+shift+d`, or `off`). Files: `~/Library/Application Support/PIA Voice/`.
+
 **Setup:** save the OpenAI key in the Keychain (`security add-generic-password -s pia-voice -a openai -w`; `OPENAI_API_KEY` also works). The binary is built on first use with `swift build -c release --package-path voice`. Needs macOS 26.
 
 ## The pieces

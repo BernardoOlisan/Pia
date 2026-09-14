@@ -37,9 +37,10 @@ public final class AudioIO {
 
     /// `inputFiles`: test mode. Speech files instead of the microphone, played in real time one per turn:
     /// the next file starts after the voice has spoken and then stayed quiet for a moment.
-    public func start(inputFiles: [URL] = []) throws {
+    /// `voiceProcessing: false` for plain dictation: nothing plays back, and voice processing would duck other audio.
+    public func start(inputFiles: [URL] = [], voiceProcessing: Bool = true) throws {
         let input = engine.inputNode
-        if inputFiles.isEmpty {
+        if inputFiles.isEmpty && voiceProcessing {
             do {
                 try input.setVoiceProcessingEnabled(true)
                 echoCancellation = true

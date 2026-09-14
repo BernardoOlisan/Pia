@@ -6,16 +6,16 @@ struct NotchGeometry {
     let notchHeight: CGFloat
     let menuBarHeight: CGFloat
     let screenFrame: CGRect
+    /// Room for the dot and the cost: "$0.00" for the intent, "$0.000" for dictation.
+    var leftContentWidth: CGFloat = 48
 
     static let meterWidth: CGFloat = 22
     static let meterHeight: CGFloat = 16
     static let inset: CGFloat = 7
-    /// Room for the dot and "$0.00".
-    static let leftContentWidth: CGFloat = 48
     /// How far the island grows per side and downward at full voice loudness.
     static let lift = CGSize(width: 10, height: 8)
 
-    static func current() -> NotchGeometry {
+    static func current(leftContentWidth: CGFloat = 48) -> NotchGeometry {
         let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }) ?? NSScreen.main ?? NSScreen.screens[0]
         let hasNotch = screen.safeAreaInsets.top > 0
         var width: CGFloat = 0
@@ -24,12 +24,15 @@ struct NotchGeometry {
         }
         let menuBar = max(screen.frame.maxY - screen.visibleFrame.maxY, screen.safeAreaInsets.top)
         return NotchGeometry(notchWidth: width, notchHeight: hasNotch ? screen.safeAreaInsets.top : 0,
-                             menuBarHeight: menuBar, screenFrame: screen.frame)
+                             menuBarHeight: menuBar, screenFrame: screen.frame, leftContentWidth: leftContentWidth)
     }
 
     var inverseRadius: CGFloat { notchHeight > 0 ? notchHeight * 0.35 : 0 }
 
-    var wingWidth: CGFloat { Self.leftContentWidth + 2 * Self.inset }
+    var wingWidth: CGFloat { leftContentWidth + 2 * Self.inset }
+
+    /// The island folded into the notch: where dictation appears from and disappears to.
+    var foldedSize: CGSize { CGSize(width: notchWidth + 2 * inverseRadius, height: restingSize.height) }
 
     /// Wider than the notch by a wing each side; as tall as the notch or menu bar, whichever is taller.
     var restingSize: CGSize {

@@ -1,14 +1,17 @@
 import AppKit
 import Foundation
+import PiaVoiceCore
 
 @main
 enum PiaVoiceMain {
     static let usage = """
     usage: pia-voice intent <work dir> [options]
+           pia-voice dictate toggle|ensure|stop
+           pia-voice dictate serve [--record] [--hotkey <keys>|off] [--stay]
+           pia-voice transcribe <audio file>
 
-      Talk through a PIA intent with GPT-Live. Prints PIA-VOICE lines for the Lead on stdout.
+    intent: talk through a PIA intent with GPT-Live. Prints PIA-VOICE lines for the Lead on stdout.
 
-    options:
       --prompts <dir>        prompts folder (default: voice/prompts/intent next to the build)
       --input-file <audio>   test mode: speech from audio files instead of the microphone; repeat it
                              for several turns, each played after the voice stops talking
@@ -16,20 +19,47 @@ enum PiaVoiceMain {
       --voice <name>         GPT-Live voice (default: marin)
       --backend-model <m>    Responses backend model (default: gpt-5.6-terra)
       --idle <seconds>       close the session after this much silence (default: 20)
+
+    dictate: record, transcribe with gpt-transcribe, copy the text to the clipboard.
+
+      toggle                 start or stop a dictation (starts the dictation process if needed)
+      ensure                 make sure the dictation process runs, and is this build
+      stop                   stop the dictation process
+      serve                  the dictation process itself (started by toggle and ensure)
+        --record             start recording right away
+        --hotkey <keys>      global shortcut, e.g. option+space (default; also PIA_TRANSCRIBE_HOTKEY), or off
+        --stay               keep running when no Claude Code is open
+
+    transcribe: transcribe one audio file with gpt-transcribe and print the text (for testing).
     """
 
     static func main() {
         var args = Array(CommandLine.arguments.dropFirst())
-        guard args.first == "intent", args.count >= 2 else {
-            FileHandle.standardError.write((usage + "\n").data(using: .utf8)!)
-            exit(args.first == "--help" || args.first == "-h" ? 0 : 1)
+        let command = args.isEmpty ? "" : args.removeFirst()
+        switch command {
+        case "intent": runIntent(args)
+        case "dictate": runDictate(args)
+        case "transcribe": runTranscribe(args)
+        case "--help", "-h": print(usage); exit(0)
+        default: fail(usage)
         }
-        args.removeFirst()
+    }
+
+    static func fail(_ message: String) -> Never {
+        FileHandle.standardError.write((message + "\n").data(using: .utf8)!)
+        exit(1)
+    }
+
+    // MARK: intent
+
+    static func runIntent(_ arguments: [String]) {
+        var args = arguments
+        guard !args.isEmpty else { fail(usage) }
         var options = Options(workDir: URL(fileURLWithPath: args.removeFirst()).standardizedFileURL)
         while !args.isEmpty {
             let flag = args.removeFirst()
             func value() -> String {
-                guard !args.isEmpty else { FileHandle.standardError.write("missing value for \(flag)\n".data(using: .utf8)!); exit(1) }
+                guard !args.isEmpty else { fail("missing value for \(flag)") }
                 return args.removeFirst()
             }
             switch flag {
@@ -39,9 +69,7 @@ enum PiaVoiceMain {
             case "--voice": options.voice = value()
             case "--backend-model": options.backendModel = value()
             case "--idle": options.idleSeconds = Double(value()) ?? 20
-            default:
-                FileHandle.standardError.write("unknown option \(flag)\n\(usage)\n".data(using: .utf8)!)
-                exit(1)
+            default: fail("unknown option \(flag)\n\(usage)")
             }
         }
         guard FileManager.default.fileExists(atPath: options.workDir.path) else {
@@ -55,17 +83,96 @@ enum PiaVoiceMain {
 
         MainActor.assumeIsolated {
             let session = IntentSession(options: options)
-            for sig in [SIGTERM, SIGINT, SIGHUP] {
-                signal(sig, SIG_IGN)
-                let source = DispatchSource.makeSignalSource(signal: sig, queue: .main)
-                source.setEventHandler { MainActor.assumeIsolated { session.end(reason: "stopped by the Lead") } }
-                source.resume()
-                signalSources.append(source)
-            }
+            onSignals([SIGTERM, SIGINT, SIGHUP]) { session.end(reason: "stopped by the Lead") }
             DispatchQueue.main.async { MainActor.assumeIsolated { session.start() } }
             retained = session
         }
         app.run()
+    }
+
+    // MARK: dictate
+
+    static func runDictate(_ arguments: [String]) {
+        var args = arguments
+        let action = args.isEmpty ? "" : args.removeFirst()
+        switch action {
+        case "toggle": exit(DictationDaemon.toggle())
+        case "ensure": exit(DictationDaemon.ensure())
+        case "stop": exit(DictationDaemon.stop())
+        case "serve": break
+        default: fail(usage)
+        }
+
+        var options = DictationOptions()
+        var hotkeyText = ProcessInfo.processInfo.environment["PIA_TRANSCRIBE_HOTKEY"]
+        while !args.isEmpty {
+            let flag = args.removeFirst()
+            switch flag {
+            case "--record": options.recordNow = true
+            case "--stay": options.stay = true
+            case "--hotkey":
+                guard !args.isEmpty else { fail("missing value for --hotkey") }
+                hotkeyText = args.removeFirst()
+            default: fail("unknown option \(flag)\n\(usage)")
+            }
+        }
+        if let text = hotkeyText, !text.isEmpty {
+            if text.lowercased() == "off" {
+                options.hotkey = nil
+            } else if let spec = HotkeySpec.parse(text) {
+                options.hotkey = spec
+            } else {
+                FileHandle.standardError.write("pia-voice: shortcut \"\(text)\" not understood; using \(HotkeySpec.default)\n".data(using: .utf8)!)
+            }
+        }
+
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        MainActor.assumeIsolated {
+            let session = DictationSession(options: options)
+            onSignals([SIGUSR1]) { session.toggle() }
+            onSignals([SIGTERM, SIGINT, SIGHUP]) { session.quit() }
+            DispatchQueue.main.async { MainActor.assumeIsolated { session.start() } }
+            retained = session
+        }
+        app.run()
+    }
+
+    // MARK: transcribe
+
+    static func runTranscribe(_ args: [String]) {
+        guard let path = args.first else { fail(usage) }
+        guard let key = Secrets.openAIKey() else { fail("no OpenAI API key. Save it with: security add-generic-password -s pia-voice -a openai -w") }
+        let done = DispatchSemaphore(value: 0)
+        var status: Int32 = 0
+        Task {
+            do {
+                let result = try await Transcription.send(apiKey: key, audioFile: URL(fileURLWithPath: path))
+                print(result.text)
+                if let seconds = result.seconds {
+                    FileHandle.standardError.write("\(seconds)s · \(DictationLedger.label(seconds / 60 * Transcription.dollarsPerMinute))\n".data(using: .utf8)!)
+                }
+            } catch {
+                FileHandle.standardError.write("pia-voice: \(error)\n".data(using: .utf8)!)
+                status = 2
+            }
+            done.signal()
+        }
+        done.wait()
+        exit(status)
+    }
+
+    // MARK: Signals
+
+    @MainActor
+    static func onSignals(_ signals: [Int32], _ handler: @escaping @MainActor () -> Void) {
+        for sig in signals {
+            signal(sig, SIG_IGN)
+            let source = DispatchSource.makeSignalSource(signal: sig, queue: .main)
+            source.setEventHandler { MainActor.assumeIsolated { handler() } }
+            source.resume()
+            signalSources.append(source)
+        }
     }
 
     nonisolated(unsafe) static var signalSources: [DispatchSourceSignal] = []
