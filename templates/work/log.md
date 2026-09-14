@@ -8,6 +8,7 @@
 - **Team:** none yet
 - **Next:** research
 - **Blockers:** none
+- **Updated:** {YYYY-MM-DD HH:MM}
 
 ## Entries
-<!-- YYYY-MM-DD HH:MM · lead · what happened (phase changes, agents spawned or replaced, messages to the human) -->
+<!-- Written only with scripts/log.sh (real time, refreshes ## Now): phase changes, agents spawned or replaced, messages to and from the human -->

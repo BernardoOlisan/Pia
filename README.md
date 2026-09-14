@@ -44,7 +44,7 @@ you: /pia:new <intention>
 
 ## Install
 
-Requires Claude Code **2.1.178+** (agent teams). Keep-awake uses macOS `caffeinate`, and is skipped where it isn't available.
+Requires Claude Code **2.1.270+** (agent teams; teammate auto-compaction verified on this version) and `python3`. Keep-awake uses macOS `caffeinate`, and is skipped where it isn't available.
 
 ```
 /plugin marketplace add BernardoOlisan/Pia
@@ -90,5 +90,7 @@ For local development, from a clone: `claude --plugin-dir /path/to/Pia`.
 - **Unattended runs:** teammate permission prompts appear in the lead's session and would wait for you. For overnight work, run Claude Code in a permission mode that won't block, e.g. `claude --permission-mode auto`.
 - **Other sessions** in a PIA project compact normally at the same window, with nothing from PIA injected.
 - **Several works at once:** fine up to the plan; only one work implements at a time.
+- **Logs keep real time:** agents log through `scripts/log.sh`, which stamps the machine's clock and refreshes `## Now` on every entry.
+- **Interrupting or restarting Claude Code** stops in-process teammates. PIA picks up from the logs; Claude Code asks you before a stopped agent is replaced.
 - **Agent teams are experimental** in Claude Code. If they're off, PIA runs the same roles as named subagents.
 - Status: early. Built in the open; expect changes.
