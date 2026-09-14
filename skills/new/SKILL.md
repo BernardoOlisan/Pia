@@ -1,9 +1,9 @@
 ---
 name: new
 description: Start a new PIA work from an intention. Keeps the machine awake, clarifies the intention with the human, then leads a team of agents through research, decisions, plan and implementation.
-argument-hint: "<your intention>"
+argument-hint: "<your intention> | --voice"
 disable-model-invocation: true
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls *), Bash(mkdir -p *), Bash(date *), Bash(git rev-parse *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/awake.sh" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/next-decision-id.sh" *)
+allowed-tools: Read, Write, Edit, Glob, Grep, Monitor, Bash(ls *), Bash(mkdir -p *), Bash(date *), Bash(git rev-parse *), Bash(swift build *), Bash("${CLAUDE_PLUGIN_ROOT}/voice/.build/release/pia-voice" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/awake.sh" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/next-decision-id.sh" *)
 ---
 
 # /pia:new (you are the PIA lead)
@@ -43,6 +43,25 @@ This is the most important conversation with the human. Ask what they want and w
 - Answers that are really decisions go under *Decided by the human*.
 
 Then write `intent.md` from `${CLAUDE_PLUGIN_ROOT}/templates/work/intent.md`, set phase `research`, and log it.
+
+### With `--voice`: the whole intent is a conversation
+
+If the arguments contain `--voice`, the human says the intention and answers your questions by talking (PIA.md → Phase 1 → *By voice*). Nothing else about the intent changes: you still think the questions, and you are the only one who writes `intent.md`.
+
+1. **Binary.** If `${CLAUDE_PLUGIN_ROOT}/voice/.build/release/pia-voice` doesn't exist, tell the human it's being built once (a few minutes), and run `swift build -c release --package-path "${CLAUDE_PLUGIN_ROOT}/voice"`. If it fails, tell the human and continue the intent in the terminal.
+2. **Start it** right after creating the work, with the Monitor tool (persistent, so every line reaches you as an event):
+   ```bash
+   "${CLAUDE_PLUGIN_ROOT}/voice/.build/release/pia-voice" intent .pia/work/<id>
+   ```
+   Create `intent.md` from the template first, so pia-voice can watch it. Tell the human in one line: "Talk when you're ready; the notch is listening."
+3. **React to its lines**, logging each one (`FROM VOICE: …`):
+   - `PIA-VOICE READY {…}`: nothing to do.
+   - `PIA-VOICE INTENT {json}`: fill the top of `intent.md` with it (it may come again with changes). Read the code you need, then write `### Round N` under `## Clarifications`, numbered questions, each with `*Suggested: …*`, in the human's language. Same rules as typed questions.
+   - `PIA-VOICE ANSWERS R<n> {json}`: write each answer after its question as ` → answer`, and add the ones with `decided_by_human: true` under *Decided by the human*. Then either write the next round, or, when the intent is clear, finish `intent.md` and add the line `<!-- pia-voice: ready to confirm -->` at its top.
+   - `PIA-VOICE CONFIRMED`: remove that line, set phase `research`, log it, and continue with the team. pia-voice exits by itself.
+   - `PIA-VOICE ENDED {json}`: the human stopped the voice. Record what it carries, and continue the intent in the terminal from the current round.
+   - `PIA-VOICE ERROR {json}`: tell the human in one line and continue the intent in the terminal.
+4. If the human types in the terminal while the voice runs, accept it as an answer too. If they ask to stop the voice, stop the Monitor task: pia-voice prints `PIA-VOICE ENDED` and exits.
 
 Tell the human in one line that you're starting, and which mode is on (they can switch with `/pia:in-the-loop` or `/pia:out-of-the-loop`).
 

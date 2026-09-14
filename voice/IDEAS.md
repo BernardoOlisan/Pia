@@ -4,7 +4,9 @@
 
 Voice is an optional feature, not the core. PIA works exactly the same without it. The `.pia/` files are the interface: voice reads them, and only the Lead (Claude Code) writes them.
 
-Status: feature 1 is designed and agreed, and we start there, this simple. Features 2 and 3 are written down so they aren't lost.
+Status: feature 1 is built (`/pia:new --voice`, Swift package in this folder). Features 2 and 3 are written down so they aren't lost.
+
+**Setup:** save the OpenAI key in the Keychain (`security add-generic-password -s pia-voice -a openai -w`; `OPENAI_API_KEY` also works). The binary is built on first use with `swift build -c release --package-path voice`. Needs macOS 26.
 
 ## The pieces
 
@@ -120,7 +122,9 @@ voice/
 
 Prompts live in their own files, not in code, so they can be read and changed without touching Swift. `intent/` is its own folder because features 2 and 3 will have their own prompts.
 
-### What each prompt says (written in English)
+### What each prompt says
+
+`voice.md` and `notices.md` are written in Spanish, because the Live prompting guide says to write the voice's prompt in the language it speaks. `backend.md` and `tools.json` are in English.
 
 **`voice.md`, the voice:**
 - You are PIA's voice in the intent phase. Speak the user's language; Spanish and Spanglish are fine.

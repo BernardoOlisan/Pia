@@ -59,6 +59,7 @@ For local development, from a clone: `claude --plugin-dir /path/to/Pia`.
 |---|---|
 | `/pia:init` | Set up PIA in a repo: `.pia/`, import `docs/RULES.md` as 📌 Binding decisions, point `CLAUDE.md` at PIA, enable auto-compaction (600k tokens) and agent teams. Restart Claude Code afterwards. |
 | `/pia:new <intention>` | Start a work. Keeps the machine awake, clarifies the intention, runs the team. |
+| `/pia:new --voice` | Same, but you say the intention and answer the questions by talking (macOS, notch, GPT-Live). See [voice/](voice/IDEAS.md). |
 | `/pia:status` | Where every work stands. |
 | `/pia:continue [work]` | Resume a work after reviewing its decisions, or in a new session. |
 | `/pia:change D-017 <answer>` | Change a decision and see its impact. |

@@ -1,0 +1,65 @@
+[
+  {
+    "type": "function",
+    "name": "send_intent",
+    "description": "Send Claude the intention as understood so far. Call as soon as it is understood, even with fields missing, and again when something important changes. Use the human's own words and language.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "intention": { "type": "string", "description": "What the human wants, 1 to 4 sentences, close to their words." },
+        "why": { "type": "string", "description": "Why they want it." },
+        "done_looks_like": { "type": "string", "description": "How they will know it is done." },
+        "in_scope": { "type": "string", "description": "What is included." },
+        "out_of_scope": { "type": "string", "description": "What is explicitly not included." },
+        "constraints": { "type": "string", "description": "Constraints or preferences they stated." }
+      },
+      "required": ["intention"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "check_questions",
+    "description": "Check intent.md for Claude's next round of questions, or whether the intent is ready to confirm. Returns status questions, ready_to_confirm or not_yet.",
+    "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
+  },
+  {
+    "type": "function",
+    "name": "send_answers",
+    "description": "Send Claude the human's answers to one round of questions, once every question of the round is answered.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "round": { "type": "integer", "description": "The round number returned by check_questions." },
+        "answers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "question_number": { "type": "integer" },
+              "question": { "type": "string", "description": "The question, short." },
+              "answer": { "type": "string", "description": "The human's answer, in their words." },
+              "decided_by_human": { "type": "boolean", "description": "True if the human chose it themselves; false if they only accepted the suggestion." }
+            },
+            "required": ["question_number", "answer", "decided_by_human"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["round", "answers"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "confirm_intent",
+    "description": "The human clearly confirmed the final intent summary. Tells Claude to start research, then the voice ends.",
+    "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
+  },
+  {
+    "type": "function",
+    "name": "end_voice",
+    "description": "The human wants to stop using voice (prefers typing, or wants to stop). Claude continues the intent in the terminal.",
+    "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
+  }
+]

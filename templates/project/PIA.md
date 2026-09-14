@@ -118,6 +118,8 @@ The intent is about **what the human wants and why**, not about how to build it.
 7. **Decisions can be answered here.** When the human answers something that is really a decision (a technology, a behavior, a trade-off), record it in `intent.md` under *Decided by the human*. In Phase 3 it becomes a card with `Status: human`, and nobody re-decides it.
 8. Write `intent.md`: readable, with the questions and answers at the bottom. Move to `research`.
 
+**By voice** (optional, `/pia:new --voice` in Claude Code on macOS): the human says the intention and answers the questions by talking, through `pia-voice` in the notch. The rules above don't change: the lead still thinks the questions and is the only writer of `intent.md`. `pia-voice` prints lines for the lead (`PIA-VOICE INTENT`, `ANSWERS R<n>`, `CONFIRMED`, `ENDED`); the lead writes each round in `intent.md` as `### Round N` with numbered questions and suggested answers, and adds `<!-- pia-voice: ready to confirm -->` at the top when the intent is ready. The conversation is kept in `logs/voice.md`.
+
 ## Phase 2: Research (researcher ⇄ reviewer)
 
 `research.md` is **for agents**. Make it exhaustive: the more complete and coherent, the better every later agent works. Use the `research.md` template.
