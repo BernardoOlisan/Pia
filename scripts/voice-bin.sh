@@ -43,10 +43,18 @@ case "${1:-}" in
     mkdir -p "$shared" "$voice/.build/release"
     # cp, not a symlink: Prompts.locate resolves symlinks and then walks up looking for prompts/intent,
     # which only exists next to the plugin's copy.
+    #
+    # Copy to a temporary name and rename over the old one, never cp straight onto it: a dictation
+    # daemon is usually running from that exact path, and writing into a mapped Mach-O invalidates its
+    # code signature, so the next launch dies with SIGKILL (Code Signature Invalid). A rename only
+    # swaps the directory entry, and the running daemon keeps the inode it already has.
     nohup bash -c '
       echo $$ > "$1"
       if nice -n 10 swift build -c release --package-path "$2" --scratch-path "$5" > "$3" 2>&1; then
-        cp -f "$5/release/pia-voice" "$4" && "$4" dictate ensure >/dev/null 2>&1
+        if cp -f "$5/release/pia-voice" "$4.new"; then
+          mv -f "$4.new" "$4" && "$4" dictate ensure >/dev/null 2>&1
+        fi
+        rm -f "$4.new"
       fi
       rm -f "$1"
     ' _ "$lock" "$voice" "$log" "$bin" "$shared" >/dev/null 2>&1 &
