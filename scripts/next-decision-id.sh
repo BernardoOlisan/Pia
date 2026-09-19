@@ -5,7 +5,7 @@
 #
 # Takes a lock, finds the highest D-NNN used anywhere in .pia/, appends one "reserved" line per new ID
 # to .pia/DECISIONS.md, releases the lock, and prints the reserved IDs (one per line).
-# The researcher later replaces each reserved line with the real one.
+# The scout later replaces each reserved line with the real one.
 set -u
 
 root="${1:-}"

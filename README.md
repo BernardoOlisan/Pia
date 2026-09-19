@@ -2,25 +2,27 @@
 
 **Decision Driven Development (DDD).** A good agentic system, given an intention, resources and context, should work for hours, even all night. Your attention goes only to the decisions.
 
-PIA is a workflow for coding agents, packaged as a Claude Code plugin. You state an **intention**. Agents clarify it with you, then research, decide, plan and build, reviewing each other along the way. They write long, exhaustive documents for themselves. You read one thing: a **decision map**.
+PIA is a workflow for coding agents, packaged as a Claude Code plugin. You say what you want. PIA talks it through with you while a scout investigates in parallel, turns the whole thing into decisions, and builds it. It writes long, exhaustive documents for itself. You read one thing: a **decision map**.
+
+PIA only does what a session can't do by itself — memory across works, continuity after a compaction, autonomy while you're away, and that map. How to investigate, how to plan the steps and how to write the code is left to the model.
 
 → Why: [PHILOSOPHY.md](PHILOSOPHY.md)
 
 ## How it works
 
 ```
-you: /pia:new <intention>
+you: /pia:new <what you want>
   │
-  ├─ Intent      the lead asks you everything it needs to understand what you want
-  ├─ Research    researcher ⇄ reviewer (both investigate), until nothing is missing   🤖 research.md
-  ├─ Decisions   every choice becomes a decision, already decided                    👤 decisions.md
+  ├─ Talk        one conversation that is the intention AND the research.
+  │              The scout investigates while you talk, so the questions come informed.   🤖 research.md
+  ├─ Decisions   every choice becomes a decision, already decided, reviewed once         👤 decisions.md
   │              ── mode "in-the-loop": stop here and wait for you
-  ├─ Plan        planner ⇄ reviewer, a literal to-do list                            🤖 plan.md
-  ├─ Implement   implementer builds it, logging as it goes                           🤖 logs/
-  └─ Test        you test, give feedback, agents fix
+  ├─ Implement   the implementer works out its own steps and builds it                   🤖 logs/
+  └─ Test        you test, give feedback, agents fix — the feedback is just more talk
 ```
 
-- **Agents always decide.** Each decision comes with the recommended answer already chosen and the reason. You approve or change it. What you answer during the intent is recorded as decided by you.
+
+- **Agents always decide.** Each decision comes with the recommended answer already chosen and the reason. You approve or change it. What you settle during the talk is recorded as decided by you.
 - **Decisions have permanent IDs** (`D-017`) across the whole project. Change one later and PIA shows what depends on it.
 - **Decisions have weight** (🔴 high, 🟡 medium, 🟢 low) and an area, so you read what matters first.
 - **Decisions are memory.** New work reads past decisions to recommend the way you'd choose.
@@ -38,13 +40,13 @@ you: /pia:new <intention>
 - **B) On the server:** identical everywhere, but needs a connection
 
 **✅ Decided: B.** The report must look the same for every client. Consistent with D-004 (online-only).
-**Area:** reports · **Depends on:** D-004 · **Affects:** plan phases 2 and 3
+**Area:** reports · **Depends on:** D-004 · **Affects:** how the export endpoint is built
 **Status:** agent
 ```
 
 ## Install
 
-Requires Claude Code **2.1.270+** (agent teams; teammate auto-compaction verified on this version) and `python3`. Keep-awake uses macOS `caffeinate`, and is skipped where it isn't available.
+Requires Claude Code **2.1.278+** (agent teams, teammate auto-compaction, and `AGENTS.md` as project instructions) and `python3`. Keep-awake uses macOS `caffeinate`, and is skipped where it isn't available.
 
 ```
 /plugin marketplace add BernardoOlisan/Pia
@@ -57,9 +59,9 @@ For local development, from a clone: `claude --plugin-dir /path/to/Pia`.
 
 | Command | What it does |
 |---|---|
-| `/pia:init` | Set up PIA in a repo: `.pia/`, import `docs/RULES.md` as 📌 Binding decisions, point `CLAUDE.md` at PIA, enable auto-compaction (600k tokens) and agent teams. Restart Claude Code afterwards. |
-| `/pia:new <intention>` | Start a work. Keeps the machine awake, clarifies the intention, runs the team. |
-| `/pia:new --voice` | Same, but you say the intention and answer the questions by talking (macOS, notch, GPT-Live). See [voice/](voice/IDEAS.md). |
+| `/pia:init` | Set up PIA in a repo: `.pia/`, import `docs/RULES.md` as 📌 Binding decisions, move `CLAUDE.md` to `AGENTS.md` and point it at PIA, enable auto-compaction (600k tokens) and agent teams. Restart Claude Code afterwards. |
+| `/pia:new <what you want>` | Start a work. Keeps the machine awake, talks it through with you while a scout investigates, runs the team. |
+| `/pia:new --voice` | Same, but the talk happens out loud (macOS, notch, GPT-Live). See [voice/](voice/IDEAS.md). |
 | `/pia:transcribe` or **⌥Space** | Just dictation, no PIA: the island records until you click it (or press ⌥Space again), `gpt-transcribe` writes it, and the text is copied to your clipboard. Never reaches Claude. |
 | `/pia:transcribe follow` or **⌥⇧Space** | The same, but this take is **added** to the last one. The clipboard carries everything said since the last fresh take, one blank line between takes. |
 | `/pia:status` | Where every work stands. |
@@ -104,12 +106,11 @@ alias pia-transcribe-reset='pkill -f "pia-voice dictate serve"; rm -f ~/Library/
 ├── config.json       default mode, compaction window
 └── work/003-export-pdf/
     ├── state.json    phase, mode
-    ├── intent.md     👤
+    ├── talk.md       👤 the conversation, open until the work is done
     ├── research.md   🤖
     ├── decisions.md  👤
-    ├── plan.md       🤖
     ├── log.md        🤖 the lead's summary
-    └── logs/         🤖 one log per agent
+    └── logs/         🤖 one log per agent (scout, scout-reviewer, implementer)
 ```
 
 👤 for you · 🤖 for agents
@@ -118,7 +119,7 @@ alias pia-transcribe-reset='pkill -f "pia-voice dictate serve"; rm -f ~/Library/
 
 - **Unattended runs:** teammate permission prompts appear in the lead's session and would wait for you. For overnight work, run Claude Code in a permission mode that won't block, e.g. `claude --permission-mode auto`.
 - **Other sessions** in a PIA project compact normally at the same window, with nothing from PIA injected.
-- **Several works at once:** fine up to the plan; only one work implements at a time.
+- **Several works at once:** fine up to implementation; only one work implements at a time.
 - **Logs keep real time:** agents log through `scripts/log.sh`, which stamps the machine's clock and refreshes `## Now` on every entry.
 - **Interrupting or restarting Claude Code** stops in-process teammates. PIA picks up from the logs; Claude Code asks you before a stopped agent is replaced.
 - **Agent teams are experimental** in Claude Code. If they're off, PIA runs the same roles as named subagents.

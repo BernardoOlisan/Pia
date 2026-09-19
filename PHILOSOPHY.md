@@ -62,6 +62,8 @@ Every action is a decision, and everything written down must be a decision. That
 
 **The quality of the questions becomes a metric of the quality of the agent's understanding.**
 
+And good questions can't come from an agent that hasn't looked. A question worth asking usually depends on something the agent found: what already exists, what it would cost, which fork is real. So understanding the intention and investigating it are not two phases. They are one conversation, where each answer sends the investigation somewhere and the investigation supplies the next question.
+
 ## Like a company
 
 The system should behave like a company. The boss doesn't need to be present for every operation.
@@ -90,7 +92,17 @@ Some decisions are hard to undo and shape everything; others are local and cheap
 
 ## The work never stops
 
-If an agent runs out of context, the work must not stop. There must be handoffs and reviewers, plus logs and automatic compaction. A reviewer agent challenges the researcher until the research is complete, and the planner until the plan is. The human doesn't step into those loops.
+If an agent runs out of context, the work must not stop. There must be handoffs and reviewers, plus logs and automatic compaction. A reviewer challenges the research until nothing important is missing. The human doesn't step into those loops.
+
+## What the harness is for
+
+A harness should do the boring work, not the hard work.
+
+**The rule: PIA owns what a session cannot do for itself.** Memory across works. Continuity after a compaction. Autonomy while you're away. The map you read when you come back. Everything else — how to investigate, how to plan, how to write the code — the model already does well. Every rule we give a model about *how to think* is a rule that will age.
+
+**Thick competes, thin compounds.** A thick harness competes with the models: every time they get better, the process we imposed gets more in the way. A thin one compounds with them: the model improves and the harness improves for free. So the right direction for this system over time is down, not up.
+
+**Complexity isn't detected, it's made irrelevant.** A one-line fix and a three-day migration don't need different processes, and the system shouldn't have to work out which is which — guessing would be its own complexity, and it would guess wrong. If the harness only does what a session can't do alone, it fits both: the one thing always required is the decisions, and small work simply has few of them. The conversation is what sizes the work, because by the end of it you already know whether there are three decisions or thirty.
 
 ## Decisions become memory
 

@@ -72,7 +72,7 @@ final class IntentSession {
         guard let promptsURL = Prompts.locate(override: options.promptsDir) else { fail(Prompts.LoadError.notFound.description); return }
         do { prompts = try Prompts.load(dir: promptsURL) } catch { fail("\(error)"); return }
 
-        let intentURL = options.workDir.appendingPathComponent("intent.md")
+        let intentURL = IntentFile.locate(in: options.workDir)
         tools = IntentTools(intentURL: intentURL) { [emitter] line in emitter.line(line) }
         let workID = options.workDir.lastPathComponent
         if let data = try? Data(contentsOf: options.workDir.appendingPathComponent("state.json")),

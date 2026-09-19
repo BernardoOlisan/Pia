@@ -6,10 +6,11 @@ It is owned by the plugin and refreshed by `/pia:init`. Don't edit it by hand. A
 
 ## The idea in one minute
 
+- **PIA only does what a session can't do by itself:** memory across works, continuity after a compaction, autonomy while the human is away, and the map the human reads when they come back. How to investigate, how to plan the steps and how to write the code is left to the model.
 - Long, exhaustive documents are for agents. The human reads a **decision map**.
 - **Everything written is a decision.** The human reviews the decisions that govern the work, not the work itself.
 - **Agents always decide.** The recommended answer *is* the decision, with its reason. The human can change any decision at any time, and the system works out what depends on it.
-- **The work never stops** because the human is away or an agent ran out of context: logs, reviewers, replacements and automatic compaction keep it going.
+- **The work never stops** because the human is away or an agent ran out of context: logs, a reviewer, replacements and automatic compaction keep it going.
 - **Decisions become memory.** Past decisions shape future recommendations.
 
 ## Layout
@@ -22,12 +23,11 @@ It is owned by the plugin and refreshed by `/pia:init`. Don't edit it by hand. A
 ├── .gitignore             ignores *.pid and the ID lock
 └── work/<NNN-slug>/       one folder per intention (feature, fix, anything)
     ├── state.json         id, title, mode, phase, lead session
-    ├── intent.md          👤 the clarified intention
-    ├── research.md        🤖 exhaustive research
+    ├── talk.md            👤 the conversation: the intention, what was found, what the human decided
+    ├── research.md        🤖 exhaustive research, written while the talk is happening
     ├── decisions.md       👤 the decision map
-    ├── plan.md            🤖 exhaustive plan
     ├── log.md             🤖 the lead's summary log, with "## Now" at the top
-    ├── logs/<agent>.md    🤖 one log per agent (researcher-004.md, reviewer-004.md, …)
+    ├── logs/<agent>.md    🤖 one log per agent (scout-004.md, scout-reviewer-004.md, …)
     └── caffeinate.pid     temporary, never committed
 ```
 
@@ -36,17 +36,19 @@ It is owned by the plugin and refreshed by `/pia:init`. Don't edit it by hand. A
 ## Phases
 
 ```
-intent → research → decisions → [stop here if mode = in-the-loop] → plan → implement → test → done
+talk → decisions → [stop here if mode = in-the-loop] → implement → test → done
 ```
 
-`state.json` → `phase` is one of: `intent`, `research`, `decisions`, `awaiting-review`, `plan`, `implement`, `test`, `done`. Whoever moves a work to a new phase updates `phase` and `updated`.
+`state.json` → `phase` is one of: `talk`, `decisions`, `awaiting-review`, `implement`, `test`, `done`. Whoever moves a work to a new phase updates `phase` and `updated`.
+
+**There is no plan phase and no plan document.** The implementer works out its own steps from the decision map and the research, and keeps them as a short checklist in its log. A model plans its own work well; a separate planning stage only restates what is already written.
 
 ## Mode
 
 - **`in-the-loop`** (default): the human stays in the loop. Stop when the decision map is finished and wait for the human.
-- **`out-of-the-loop`**: keep going through plan and implementation without stopping (e.g. overnight). The human reviews the decisions afterwards.
+- **`out-of-the-loop`**: keep going through implementation without stopping (e.g. overnight). The human reviews the decisions afterwards.
 
-The project default lives in `.pia/config.json`; each work has its own `mode` in `state.json`. The human switches it at any time (`/pia:in-the-loop`, `/pia:out-of-the-loop`, or just saying so). **The lead reads `mode` from `state.json` at the moment the decision map is finished, not before**, so switching during research works.
+The project default lives in `.pia/config.json`; each work has its own `mode` in `state.json`. The human switches it at any time (`/pia:in-the-loop`, `/pia:out-of-the-loop`, or just saying so). **The lead reads `mode` from `state.json` at the moment the decision map is finished, not before**, so switching during the talk works.
 
 ## Keep-awake (caffeinate)
 
@@ -65,37 +67,36 @@ In Claude Code: `bash "<plugin>/scripts/awake.sh" start|stop|status .pia/work/<i
 
 | Role | Who | Writes |
 |---|---|---|
-| **Lead** | the session the human talks to | `state.json`, `intent.md`, `log.md`, messages to the human |
-| **Researcher** | teammate `researcher-<NNN>` | `research.md`, `decisions.md`, lines in `DECISIONS.md` |
-| **Reviewer** | teammate `reviewer-<NNN>` (a fresh one for the plan: `plan-reviewer-<NNN>`) | nothing but its own log and messages |
-| **Planner** | teammate `planner-<NNN>` | `plan.md` |
-| **Implementer** | teammate `implementer-<NNN>`; a fresh `implementer-<NNN>-2`, `-3`… for each round of test feedback | code, check-offs in `plan.md` |
+| **Lead** | the session the human talks to | `state.json`, `talk.md`, `log.md`, messages to the human |
+| **Scout** | teammate `scout-<NNN>` | `research.md`, `decisions.md`, lines in `DECISIONS.md` |
+| **Scout reviewer** | teammate `scout-reviewer-<NNN>` | nothing but its own log and messages |
+| **Implementer** | teammate `implementer-<NNN>`; a fresh `implementer-<NNN>-2`, `-3`… for each round of test feedback | code, its own step checklist |
 
 `<NNN>` is the work number. Every agent also writes its own `logs/<its name>.md`.
 
 - **How agents are spawned.** In Claude Code with agent teams enabled, the lead spawns each role as a teammate by calling the Agent tool with a `name`. Without agent teams, the same names spawn named subagents. Either way, agents talk only through `SendMessage`, addressing each other by name.
-- **Spawn prompt.** Every teammate gets: its role, the work id and folder, the names of the agents it talks to, the paths of the log script and the decision ID script, and the instruction to read this file first (sections *All agents*, *Team*, and its own phase sections) plus `CLAUDE.md`, `.pia/DECISIONS.md`, `state.json` and `intent.md`.
-- **The lead keeps its context small.** It coordinates; it does not read `research.md` or `plan.md` end to end. Reviewers do that.
+- **Spawn prompt.** Every teammate gets: its role, the work id and folder, the names of the agents it talks to, the paths of the log script and the decision ID script, and the instruction to read this file first (sections *All agents*, *Team*, and its own phase sections) plus `AGENTS.md`, `.pia/DECISIONS.md`, `state.json` and `talk.md`.
+- **The lead keeps its context small.** It coordinates; it does not read `research.md` end to end. It asks the scout and gets short answers.
 - **One writer per file.** Only the owner in the table above edits a file.
 - **Replacement.** If a teammate fails, stops early, or runs out of context, the lead spawns a replacement with the same role and name suffix `-2`, `-3`… It resumes from the files, the `## Now` of `log.md`, and the log of the agent it replaces. If Claude Code says the human stopped that agent (for example by interrupting or restarting Claude Code), ask the human in one line before replacing it: Claude Code requires that.
-- **Shutdown.** When a phase is finished, the lead asks the agents of that phase to shut down. The implementer shuts down at `IMPLEMENTATION DONE`; test feedback goes to a fresh one (Phase 6).
+- **Shutdown.** When a phase is finished, the lead asks the agents of that phase to shut down. The implementer shuts down at `IMPLEMENTATION DONE`; test feedback goes to a fresh one (Phase 4).
 
 ## All agents
 
-1. Before working, read: `CLAUDE.md`, this file, `state.json` and `intent.md`, and from `.pia/DECISIONS.md`: the **📌 Binding** section in full, plus the lines of *All decisions* for the areas your work touches (search by `[area]`; don't read the whole list).
+1. Before working, read: `AGENTS.md`, this file, `state.json` and `talk.md`, and from `.pia/DECISIONS.md`: the **📌 Binding** section in full, plus the lines of *All decisions* for the areas your work touches (search by `[area]`; don't read the whole list).
 2. **📌 Binding decisions are never re-decided.** Other past decisions are the default unless there is a stated reason to deviate, and deviating is itself a new decision.
 3. **Log with the log script, never by hand**, in your own file `logs/<your name>.md`:
    `bash "<plugin>/scripts/log.sh" <your log> "<what happened>" --doing "<what you're doing now>" [--next "…"] [--blockers "…"]`
-   It stamps the real time and rewrites your `## Now` in the same step, so times are never guessed and `## Now` never goes stale. Log when you start, after each meaningful step, when something fails, every `READY FOR REVIEW`, findings, `APPROVED` or report you send or receive, and when you hand off. The implementer logs at least at the start and the end of every plan phase. Keep entries short. Only the lead writes `log.md` (it also passes `--phase` and `--team`). Any other time you write (`state.json`, history lines) comes from `date '+%Y-%m-%d %H:%M'`. Without the script: take the time from the machine clock and update `## Now` with every entry.
+   It stamps the real time and rewrites your `## Now` in the same step, so times are never guessed and `## Now` never goes stale. Log when you start, after each meaningful step, when something fails, every `READY FOR REVIEW`, findings, `APPROVED` or report you send or receive, and when you hand off. The implementer logs at least at the start and the end of every step group. Keep entries short. Only the lead writes `log.md` (it also passes `--phase` and `--team`). Any other time you write (`state.json`, history lines) comes from `date '+%Y-%m-%d %H:%M'`. Without the script: take the time from the machine clock and update `## Now` with every entry.
 4. **After compaction or a restart**, before doing anything: re-read this file (*All agents* and your phase sections), `state.json`, the `## Now` of `log.md`, and your own log. Re-read **only those parts** (ranged reads, or search for the section), not whole documents: re-reading everything after every compaction fills the context again and can make compaction loop.
 5. **Only the lead talks to the human.** Anything else that would need a human answer becomes a decision: decide it and record it.
-6. **Don't execute destructive or outward-facing actions** (force-push, pushing to a protected branch, deleting data, spending money, messaging people, deploying to production) unless `intent.md` or a decision explicitly authorizes it. Otherwise record it as a decision and leave the action for the human.
+6. **Don't execute destructive or outward-facing actions** (force-push, pushing to a protected branch, deleting data, spending money, messaging people, deploying to production) unless `talk.md` or a decision explicitly authorizes it. Otherwise record it as a decision and leave the action for the human.
 7. All PIA documents are written in **English**. The lead talks to the human in the human's language.
 8. **Images fill the context fast.** Shrink screenshots before reading them (on macOS: `sips -Z 1000 <file>`), and don't read the same image twice.
 
 ## Writing for the human
 
-Everything the human reads (the intent questions, `intent.md`, `decisions.md`, messages from the lead) is written to be understood without effort:
+Everything the human reads (the talk, `talk.md`, `decisions.md`, messages from the lead) is written to be understood without effort:
 
 - **Plain words and short sentences.** One idea per sentence.
 - **Teach, don't show off.** When a technical term is needed, explain it in a few words the first time.
@@ -103,42 +104,48 @@ Everything the human reads (the intent questions, `intent.md`, `decisions.md`, m
 - **Lead with the point**, then the reason.
 - **No code names or file paths** unless the human needs them to act.
 
-## Phase 1: Intent (lead + human)
+## Phase 1: The talk (lead + human, scout underneath)
 
-**Don't assume the intention. Clarify it until you truly understand it.** This is the most important conversation with the human. *"How will I know the agent understands? When it asks me the right questions."* The quality of the questions is the measure of the agent's understanding.
+One conversation that is the intention **and** the research at the same time. Not rounds of questions. The human says what they want; the lead investigates while they talk, and asks only what it can't find out on its own.
 
-The intent is about **what the human wants and why**, not about how to build it. Finding causes, reading the code in depth and making technical choices is research's job.
+*"How will I know the agent understands? When it asks me the right questions."* A question worth asking almost always depends on something the agent found. That is why the investigation runs during the talk and not after it.
 
-1. Read the intention, the relevant parts of `DECISIONS.md`, and only enough of the code to know what exists and to ask good questions.
-2. Ask about the **outcome**, mostly in business terms: what exactly they want, why, for whom, what "done" looks like, what is in and out of scope, constraints, the cases that matter to them, and their preferences.
-3. **Technical questions only when needed before research**: when the answer changes what research has to look at, or the human clearly wants to make that choice (e.g. which framework for a new backend). Everything else becomes a decision in Phase 3.
-4. **Don't pre-decide or diagnose.** No hypotheses about causes, no proposed solutions, no file names or code in the questions.
-5. **Be friendly.** Talk like a colleague, follow *Writing for the human*. Number the questions, keep each one short, give a suggested answer in plain words, and keep rounds small (usually 3 to 8 questions), so the human can reply "yes to all", answer only some, or say "you decide".
-6. Keep asking in new rounds while answers open new questions. Stop when you could explain the work back to the human without guessing.
-7. **Decisions can be answered here.** When the human answers something that is really a decision (a technology, a behavior, a trade-off), record it in `intent.md` under *Decided by the human*. In Phase 3 it becomes a card with `Status: human`, and nobody re-decides it.
-8. Write `intent.md`: readable, with the questions and answers at the bottom. Move to `research`.
+**Start the scout immediately.** The moment the work exists — before the first question — the lead spawns `scout-<NNN>` with whatever the human has already said, even if it is one line. The human never talks to it.
 
-**By voice** (optional, `/pia:new --voice` in Claude Code on macOS): the human says the intention and answers the questions by talking, through `pia-voice` in the notch. The rules above don't change: the lead still thinks the questions and is the only writer of `intent.md`. `pia-voice` prints lines for the lead (`PIA-VOICE INTENT`, `ANSWERS R<n>`, `CONFIRMED`, `ENDED`); the lead writes each round in `intent.md` as `### Round N` with numbered questions and suggested answers, and adds `<!-- pia-voice: ready to confirm -->` at the top when the intent is ready. The conversation is kept in `logs/voice.md`.
+**How the lead talks:**
 
-## Phase 2: Research (researcher ⇄ reviewer)
+1. **One or two questions at a time**, in the human's language, like a colleague. No numbered rounds, no batches of eight. If an answer opens three new questions, ask the one that most changes the work and hold the rest.
+2. **Ask only what investigation can't answer.** Anything the scout can find out, the scout finds out. What's left is what only the human knows: the outcome and why, who it's for, what "done" looks like, what is in and out of scope, constraints, preferences, and which side of a real fork they want.
+3. **Ask informed.** Say what was found when it changes the question: *"Today everything goes straight to the API with no cache, so 'offline' means one of two very different things…"*. This is not diagnosing for the human; it is handing them a fork instead of a blank page.
+4. **Feed the scout as the talk moves.** Send it, in one line, what to look at next, and ask it direct questions. It answers in two or three lines, never with a document.
+5. **Never read `research.md`.** That is how the lead's context stays small however long the talk runs.
+6. **The human investigates too.** A link, an article or an idea the human brings goes into the talk, and the scout verifies it.
+7. **The human can change their mind at any point.** Keep the intention in `talk.md` at its latest version, not its first.
 
-`research.md` is **for agents**. Make it exhaustive: the more complete and coherent, the better every later agent works. Use the `research.md` template.
+**Decisions the human makes here.** When the human settles something that is really a decision (a technology, a behaviour, a trade-off), record it in `talk.md` under *Decided by you*. In Phase 2 it becomes a card with `Status: human`, and nobody re-decides it. The heaviest decisions are the best ones to settle here, while the human is present.
 
-**Progressive disclosure.** Long documents stay readable for a human who wants to dig in: open with an *At a glance* section (10 lines at most), start every section with a one-line summary, and put deep detail inside `<details><summary>…</summary>` blocks, so it reads top-down and opens only where needed. The same applies to `plan.md`.
+**How the talk ends.** When the lead could explain the work back without guessing anything, it does exactly that: a short summary of what it understood — the intention, the scope, what matters most — and asks the human to confirm. Not more questions about details: a demonstration of understanding. If the human corrects it, or thinks of something new right after it, the talk simply carries on. **The talk is never closed**: test feedback lands in it too (Phase 4).
+
+**Write `talk.md` as the talk goes**, not at the end, using the `talk.md` template. Then set phase `decisions`.
+
+**By voice** (optional, `/pia:new --voice` in Claude Code on macOS): the human says the intention and answers by talking, through `pia-voice` in the notch. The rules above don't change: the lead still thinks the questions and is the only writer of `talk.md`. `pia-voice` prints lines for the lead (`PIA-VOICE INTENT`, `ANSWERS R<n>`, `CONFIRMED`, `ENDED`). The voice protocol is still round-based, so on the voice path only, the lead writes its questions under `## The conversation` as `### Round N` blocks with numbered questions and suggested answers, and adds `<!-- pia-voice: ready to confirm -->` at the top when the talk is ready to confirm. The conversation is kept in `logs/voice.md`.
+
+## Phase 2: Research and decisions (scout ⇄ scout-reviewer)
+
+`research.md` is **for agents**. It is written during the talk, not after it, and it is exhaustive: the more complete and coherent, the better every later agent works. Use the `research.md` template.
+
+**Progressive disclosure.** Long documents stay readable for a human who wants to dig in: open with an *At a glance* section (10 lines at most), start every section with a one-line summary, and put deep detail inside `<details><summary>…</summary>` blocks.
 
 - Read the real code in the area **deeply**: trace the actual flow, don't skim.
 - **Web research is mandatory** for every external library, framework, API, model or SDK in play: read the current docs, verify versions, cite URLs, flag anything deprecated or decaying.
 - Include: current state, how it really works today, related components, data and flow, constraints, the 📌 Binding decisions that touch this area, relevant past decisions, edge cases, risks, and an index of key files.
-- **No "Open Questions" section.** Every open point, fork or assumption becomes a decision in Phase 3.
-- When done, send `READY FOR REVIEW: research.md` to the reviewer (see *Reviewing*).
+- **No "Open Questions" section.** Every open point, fork or assumption becomes a decision.
 
-## Phase 3: Decisions (researcher ⇄ reviewer)
+Then write `decisions.md`, which is **for the human**. Follow the `decisions.md` template exactly, and *Writing for the human*.
 
-`decisions.md` is **for the human**. Follow the `decisions.md` template exactly, and *Writing for the human*.
-
-1. **List every decision the work needs** (architecture, where things run, data, behavior, libraries, failure cases, trade-offs) and every assumption you would otherwise make silently. *Everything written must be a decision.*
+1. **List every decision the work needs** (architecture, where things run, data, behaviour, libraries, failure cases, trade-offs) and every assumption you would otherwise make silently. *Everything written must be a decision.*
 2. **Learn how the human thinks first.** Read the lines of `DECISIONS.md` for the areas this work touches (and past works' `decisions.md` when relevant). Recommend consistently with past choices and say so: *"Consistent with D-004."*
-3. **Always decide.** The recommended option is the decision. Say why in one or two sentences. Decisions the human already answered in the intent keep the human's answer, with `Status: human`.
+3. **Always decide.** The recommended option is the decision. Say why in one or two sentences. Decisions the human already made in the talk keep the human's answer, with `Status: human`.
 4. **IDs are global and permanent.** Reserve them with the decision ID script (`next-decision-id.sh <project root> <work id> <count>`): it takes a lock, so two works never get the same number, and appends `⏳ reserved` lines to `DECISIONS.md`. Replace each reserved line with the real one when its card is written. Without the script: take the next number after the highest `D-NNN` in `.pia/` and append its line right away. Never reuse or renumber.
 5. **Area:** give every decision a short lowercase area (`reports`, `auth`, `sync`…). Reuse existing areas from `DECISIONS.md` before inventing one.
 6. **Weight** every decision:
@@ -146,60 +153,62 @@ The intent is about **what the human wants and why**, not about how to build it.
    - 🟡 **Medium:** affects one area; undoing it costs some rework.
    - 🟢 **Low:** local; cheap to change later.
 7. **Order** High → Medium → Low. Fill the summary line at the top.
-8. **Each card stands alone, and is short.** Write it for a reader who has read nothing else: a context of at most 3 short sentences (what is being built and why this decision exists), 2 to 4 options with their consequence in one line each, the decision and its reason in one or two sentences, its area, what it depends on and what it affects. *Simple to read, deep at the same time.* Detail that doesn't fit belongs in `research.md`.
-9. Send `READY FOR REVIEW: decisions.md` to the reviewer.
+8. **Each card stands alone, and is short.** Write it for a reader who has read nothing else: a context of at most 3 short sentences, 2 to 4 options with their consequence in one line each, the decision and its reason in one or two sentences, its area, what it depends on and what it affects. Detail that doesn't fit belongs in `research.md`.
+9. Send `READY FOR REVIEW` to the scout reviewer, naming both files.
 10. When approved: make sure every decision has its final line in `DECISIONS.md` (`D-NNN  weight  [area] what was decided · work/<id> · status`, no `⏳` left), then tell the lead `DECISIONS DONE`.
 
 **Lead, when decisions are done:** read `mode` from `state.json` now.
-- `in-the-loop` → set phase `awaiting-review`, **stop caffeinate**, shut down the researcher and reviewer, and send the human a short message: counts by weight, the titles of the 🔴 decisions, the path to `decisions.md`, and how to continue (change any decision by saying so or with `/pia:change`, then `/pia:continue`). Then stop.
-- `out-of-the-loop` → set phase `plan`, shut down the researcher and reviewer, and go to Phase 4.
+- `in-the-loop` → set phase `awaiting-review`, **stop caffeinate**, shut down the scout and its reviewer, and send the human a short message: counts by weight, the titles of the 🔴 decisions, the path to `decisions.md`, and how to continue (change any decision by saying so or with `/pia:change`, then `/pia:continue`). Then stop.
+- `out-of-the-loop` → set phase `implement`, shut down the scout and its reviewer, and go to Phase 3.
 
-## Reviewing (reviewer)
+## Reviewing (scout reviewer)
 
-The reviewer is as exhaustive as the author. It doesn't just check the document: **it investigates on its own**, in the code and on the web, with the same depth as the researcher, to confirm every claim and to find everything that is missing. It is adversarial and concrete.
+One reviewer, one pass over both files. It doesn't just check the documents: **it investigates on its own**, in the code and on the web, to confirm the facts and to find what is missing. It is adversarial and concrete, and it reviews **substance, not prose**.
 
-- **research.md:** independently trace the flows in the real code and read the current external docs; confirm or refute each claim; hunt for missing areas, flows, edge cases, versions and risks. Nothing important may be missing.
-- **decisions.md:** complete (every fork and assumption found by you or the researcher is a decision; nothing is silently assumed), coherent (no contradictions with each other, with 📌 Binding, with the intent, or with decisions the human made in the intent), well written (each card stands alone and follows *Writing for the human*: a card that is too long or full of jargon is a finding), weights and areas sensible, recommendations justified and consistent with past decisions.
-- **plan.md:** independently check the plan against the code; every decision is implemented by some step; steps are specific enough to execute mechanically; nothing contradicts a decision; tests are defined per phase.
+- **research.md:** independently trace the flows in the real code and read the current external docs; confirm or refute each claim; hunt for missing areas, flows, edge cases, versions and risks. Nothing important may be missing. *(This is where the reviewer earns its keep: a claim nobody checked becomes a decision built on sand.)*
+- **decisions.md:** complete (every fork and assumption found by you or the scout is a decision; nothing is silently assumed), coherent (no contradictions with each other, with 📌 Binding, with the talk, or with decisions the human made in it), weights and areas sensible, recommendations justified and consistent with past decisions.
+- **Not a finding:** wording, tone, or a card you would have phrased differently. *Writing for the human* is the author's job, not a review round.
 
-Loop: reply to the author with **numbered findings** (each with the evidence you found), or `APPROVED: <file>`. The author fixes and sends `READY FOR REVIEW` again. On approval, also message the lead `APPROVED: <file>`.
+Loop: reply to the scout with **numbered findings** (each with the evidence you found), or `APPROVED`. The scout fixes and sends `READY FOR REVIEW` again. On approval, also message the lead `APPROVED`.
 
 **Messages can get lost** (for example while an agent is compacting). So nobody waits blindly:
 - Both sides log every `READY FOR REVIEW`, findings and `APPROVED` they send or receive.
-- **Reviewer:** after a compaction or when you go idle, check the files yourself. If the document you're waiting for exists and changed since your last review, review it without waiting for the message.
-- **Author:** if you're waiting for the reviewer and nothing arrives, send `READY FOR REVIEW` again and tell the lead.
+- **Reviewer:** after a compaction or when you go idle, check the files yourself. If a document you're waiting for exists and changed since your last review, review it without waiting for the message.
+- **Scout:** if you're waiting for the reviewer and nothing arrives, send `READY FOR REVIEW` again and tell the lead.
 - **Lead:** if both are idle and nothing moved, it's a deadlock: nudge both with what each is waiting for, and log it.
 
-**The work must not stall.** After 5 rounds without approval, approve and turn each remaining disagreement into a decision (decided, with both positions in the options).
+**The work must not stall.** After 3 rounds without approval, approve and turn each remaining disagreement into a decision (decided, with both positions in the options).
 
-## Phase 4: Plan (planner ⇄ plan-reviewer)
+## Phase 3: Implement (implementer)
 
-`plan.md` is **for agents**: a literal to-do list built from `research.md` and `decisions.md`. Use the `plan.md` template, with progressive disclosure (see Phase 2).
+The implementer plans its own work. There is no plan document to follow.
 
-- **No new decisions.** If one is truly missing, message the lead: it goes back to the researcher (or, if the researcher is gone, the planner appends the card) with `Status: agent`, and the reviewer checks it.
-- A short **"How it works"** section: the behavior, step by step, as cause → effect.
-- **Phases** with checkbox steps. Each step names the files it touches and the decision IDs it implements: `- [ ] 2.3 Render the PDF on the server [D-017]`.
-- **Tests per phase** (what to run, what must pass).
-- Send `READY FOR REVIEW: plan.md` to the plan-reviewer. When approved, the lead shuts down the planner and plan-reviewer and moves to Phase 5 (checking *Works in parallel* first).
-
-## Phase 5: Implement (implementer)
-
-- Follow `plan.md` step by step. Check off each step when done. Run the tests/typecheck at the end of each phase.
-- **No stops in the middle.** The human may be asleep. If something blocks, decide how to proceed (a decision), log it, and keep going.
-- Log every meaningful step and every failure in your log, and at least the start and end of every plan phase.
-- **After each plan phase**, send the lead `PHASE DONE <n> of <total>: <one line>`. The lead logs it, so its `## Now` shows real progress.
-- When everything is done, tell the lead `IMPLEMENTATION DONE` with: what was built (3 to 5 bullets), how to test it (short numbered steps), and what you could not verify yourself.
+1. Read `decisions.md` and `research.md`, and write a **short checklist** under `## Steps` at the top of your own log: one line per step, each naming the decision IDs it implements, e.g. `- [ ] 2 Render the PDF on the server [D-017]`. Keep it to the steps that matter, not every file edit. Every decision must be implemented by some step.
+2. Build it, checking off each step as you finish it, and running the tests/typecheck for the part you just changed.
+3. **No stops in the middle.** The human may be asleep. If something blocks, decide how to proceed (a decision), log it, and keep going.
+4. **No new decisions quietly.** If a real fork appears that no card covers, decide it, append the card with `Status: agent` and its line in `DECISIONS.md`, and log it so the human sees it in the map.
+5. **After each step**, send the lead `STEP DONE <n> of <total>: <one line>`. The lead logs it, so its `## Now` shows real progress.
+6. When everything is done, tell the lead `IMPLEMENTATION DONE` with: what was built (3 to 5 bullets), how to test it (short numbered steps), and what you could not verify yourself.
 
 **Lead:** set phase `test`, **stop caffeinate**, shut down the implementer, and send the human that summary, short.
 
-## Phase 6: Test (human ⇄ lead ⇄ implementer)
+## Phase 4: Test (human ⇄ lead ⇄ implementer)
 
-- The human tests and gives feedback to the lead.
-- **If feedback contradicts a decision**, the lead first records it as a changed decision (see *Changing a decision*) and adds a `## Change D-NNN` phase to `plan.md`; the human's feedback counts as the go.
-- **Each round of feedback gets a fresh implementer** (`implementer-<NNN>-2`, then `-3`…), with the round's items in its spawn prompt. It resumes from `plan.md`, the latest round in `intent.md`, and the previous implementer's log, so it starts with a clean context. Later items from the same round go to it by message. Start caffeinate while it works and stop it when it reports.
-- The implementer fixes each item (a failing test first, then the code), logs it under `## Test & fixes` in its log (what failed, why it failed, the fix), and tells the lead `FIXES DONE` with the same short summary as `IMPLEMENTATION DONE`. Then the lead shuts it down.
+- The human tests and gives feedback to the lead. **The feedback is more of the talk:** the lead appends it to `## The conversation` in `talk.md`, in order, with its date. It does not go anywhere else and it is not a new round of anything.
+- **If feedback contradicts a decision**, the lead first records it as a changed decision (see *Changing a decision*); the human's feedback counts as the go.
+- **Each round of feedback gets a fresh implementer** (`implementer-<NNN>-2`, then `-3`…), with the round's items in its spawn prompt. It resumes from `decisions.md`, the latest part of `talk.md`, and the previous implementer's log and checklist, so it starts with a clean context. Later items from the same round go to it by message. Start caffeinate while it works and stop it when it reports.
+- The implementer fixes each item (a failing test first, then the code), logs each fix with the log script (what failed, why it failed, the fix), and tells the lead `FIXES DONE` with the same short summary as `IMPLEMENTATION DONE`. Then the lead shuts it down.
 - **Open questions before closing.** Whenever the lead asks the human about a decision, it logs `ASKED D-NNN: <question>`, and `ANSWERED D-NNN` when the human answers. Before setting `done`, the lead lists every question still unanswered and asks once more. If the human closes without answering, those cards keep the agent's decision.
-- When the human says it's done: phase `done`, shut down the team.
+- When the human says it's done: **mark every card still `Status: agent` as `approved`** (in `decisions.md` and `DECISIONS.md`), set phase `done`, and shut down the team.
+
+## Approving the map
+
+A card written by an agent is `agent` until the human has had the chance to see it. It becomes `approved` when:
+
+- the human continues a work that was waiting at `awaiting-review` (`/pia:continue`, `/pia:out-of-the-loop`, or just saying go); or
+- the human closes the work as `done`, whatever the mode.
+
+**This applies to `out-of-the-loop` too.** Those works never pass through `awaiting-review`, so their cards would otherwise stay `agent` for ever and the map would never say what the human has actually seen.
 
 ## Changing a decision
 
@@ -207,11 +216,13 @@ When the human changes a decision (by saying so or with `/pia:change`), the lead
 
 1. Update the card: new decision and reason, `Status: changed`, and one history line: `Was: B (agent) · changed YYYY-MM-DD`.
 2. Update its line in `DECISIONS.md`.
-3. **Find the impact:** cards whose *Depends on* includes it, plan steps tagged with it, and implemented steps in the logs.
+3. **Find the impact:** cards whose *Depends on* includes it, steps tagged with it in the implementer's checklist, and implemented steps in the logs.
 4. Tell the human the impact as a short list.
-5. If the work is already planned or implemented, add a `## Change D-NNN` phase to `plan.md` for the affected steps. In `out-of-the-loop` mode implement it; in `in-the-loop` mode wait for the human's go.
+5. If the work is already implemented, the change goes to an implementer as a round of test feedback (Phase 4). In `out-of-the-loop` mode start it; in `in-the-loop` mode wait for the human's go.
 
-When the human continues a work after reviewing its map, every card still marked `agent` becomes `approved`.
+## Constraints the human changes mid-flight
+
+When the human reverses or adds a constraint that governs the work ("don't commit anything" → "commit and push", "no new libraries after all"), that is a decision, not a passing remark. The lead records it as a card like any other — ID, weight, area, `Status: human` — or changes the existing card if one covers it. Otherwise the instruction lives only in the chat, and the next agent, or the next compaction, never sees it.
 
 ## 📌 Binding decisions
 
@@ -221,8 +232,8 @@ The `📌 Binding` section of `DECISIONS.md` holds rules every work follows, in 
 
 Several works can run at the same time, each with its own lead session, folder and caffeinate.
 
-- **Up to the plan, in parallel is fine.** Decision IDs never collide thanks to the ID script.
-- **Only one work implements at a time.** Before moving to `implement`, the lead checks the other works' `state.json`. If another work is in `implement`, this work stays in `plan` with a blocker in `## Now` ("waiting for work NNN to finish implementing"), **stops caffeinate**, and tells the human. It continues with `/pia:continue` once the other work reaches `test` or `done`.
+- **Talking and deciding in parallel is fine.** Decision IDs never collide thanks to the ID script.
+- **Only one work implements at a time.** Before moving to `implement`, the lead checks the other works' `state.json`. If another work is in `implement`, this work stays in `decisions` with a blocker in `## Now` ("waiting for work NNN to finish implementing"), **stops caffeinate**, and tells the human. It continues with `/pia:continue` once the other work reaches `test` or `done`.
 
 ## Compaction
 

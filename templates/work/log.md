@@ -3,10 +3,10 @@
 > The lead's summary log. Each agent keeps its own detailed log in `logs/<agent name>.md`.
 
 ## Now
-- **Phase:** intent
-- **Doing:** clarifying the intention with the human
-- **Team:** none yet
-- **Next:** research
+- **Phase:** talk
+- **Doing:** talking with the human while the scout investigates
+- **Team:** scout-{NNN}
+- **Next:** decisions
 - **Blockers:** none
 - **Updated:** {YYYY-MM-DD HH:MM}
 

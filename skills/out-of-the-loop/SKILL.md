@@ -15,6 +15,6 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls *), Bash(date *), Bash(bas
 
 Set `"mode": "out-of-the-loop"` and `updated` in its `state.json`, and log the switch with `bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh" .pia/work/<id>/log.md "mode → out-of-the-loop" --doing "<what the lead is doing>" --phase <phase>`.
 
-If its phase is `awaiting-review`, the human is also saying "go": continue exactly as `/pia:continue` does for `awaiting-review` (approve untouched cards, phase `plan`, **start caffeinate**, lead the plan and implementation per `.pia/PIA.md`).
+If its phase is `awaiting-review`, the human is also saying "go": continue exactly as `/pia:continue` does for `awaiting-review` (approve untouched cards, **start caffeinate**, phase `implement`, lead the implementation per `.pia/PIA.md`).
 
 Otherwise reply in one line: the work, and that it won't stop at the decision map.

@@ -1,12 +1,13 @@
 # Research: {work title}
 
-> For agents: exhaustive by design. No open questions: every open point becomes a decision.
+> For agents: exhaustive by design, and written *during* the talk, not after it.
+> No open questions: every open point becomes a decision.
 > Progressive disclosure: *At a glance* first, a one-line summary per section, deep detail inside `<details>`.
 
 ## At a glance
 {≤10 lines: what exists today, what has to change, the biggest risks, how many decisions this leads to}
 
-## 1. Intent recap
+## 1. The intention, recapped
 {one-line summary}
 
 ## 2. Current state: how it really works today

@@ -20,7 +20,7 @@
   {
     "type": "function",
     "name": "check_questions",
-    "description": "Check intent.md for Claude's next round of questions, or whether the intent is ready to confirm. Returns status questions, ready_to_confirm or not_yet.",
+    "description": "Check talk.md for Claude's next round of questions, or whether the intent is ready to confirm. Returns status questions, ready_to_confirm or not_yet.",
     "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
   },
   {

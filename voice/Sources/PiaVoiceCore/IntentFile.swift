@@ -1,9 +1,21 @@
 import Foundation
 
-/// What pia-voice reads from the Lead's `intent.md`. The voice never writes it.
+/// What pia-voice reads from the Lead's `talk.md`. The voice never writes it.
 public enum IntentFile {
-    /// The Lead writes this line when the intent is finished and waits for the human's confirmation.
+    /// The Lead writes this line when the talk is finished and waits for the human's confirmation.
     public static let readyMarker = "<!-- pia-voice: ready to confirm -->"
+
+    /// `talk.md`, or `intent.md` for works started before the talk replaced the intent phase.
+    public static func locate(in workDir: URL) -> URL {
+        let talk = workDir.appendingPathComponent("talk.md")
+        if FileManager.default.fileExists(atPath: talk.path) { return talk }
+        let intent = workDir.appendingPathComponent("intent.md")
+        return FileManager.default.fileExists(atPath: intent.path) ? intent : talk
+    }
+
+    /// Everything above the first of these is the summary the voice reads back.
+    static let bodyHeadings = ["## What we found", "## Decided by you", "## The conversation",
+                               "## Decided by the human", "## Clarifications"]
 
     public struct Round: Equatable {
         public let number: Int
@@ -17,7 +29,7 @@ public enum IntentFile {
     public struct State: Equatable {
         public var rounds: [Round] = []
         public var readyToConfirm = false
-        /// Everything above "## Decided by the human" (or "## Clarifications").
+        /// Everything above the first body heading.
         public var summary = ""
 
         /// The first round that still has unanswered questions.
@@ -38,7 +50,7 @@ public enum IntentFile {
 
         var summaryLines: [String] = []
         for line in lines {
-            if line.hasPrefix("## Decided by the human") || line.hasPrefix("## Clarifications") { break }
+            if bodyHeadings.contains(where: line.hasPrefix) { break }
             if line.contains(readyMarker) { continue }
             summaryLines.append(line)
         }
