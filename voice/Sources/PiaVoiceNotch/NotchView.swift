@@ -8,7 +8,13 @@ import SwiftUI
 /// the voice is white and counts a conversation.
 ///
 /// Left: a dot for whether a session is open, and the time this conversation has been billed for.
-/// Right: the live waveform — your voice, and the voice answering.
+/// Right: the live waveform — your voice, and the voice answering — but only while a session is open.
+///
+/// That last part is the whole design. GPT-Live bills by the second, silence included, so a session
+/// opens when you speak and closes itself after a while of quiet. The island shows exactly that: wide
+/// and moving while it costs money, narrow and breathing while it does not. You can tell what you are
+/// paying for without reading a number.
+///
 /// Double-click reveals the cost, exactly as it does for dictation. One click ends the voice.
 public struct NotchView: View {
     @Bindable var model: NotchModel
@@ -33,14 +39,19 @@ public struct NotchView: View {
         return width
     }
 
-    private var trailingWidth: CGFloat { Self.slotWidth + geometry.contentInset }
-
-    /// Resting width, plus the lift while the voice speaks, scaled by its real loudness.
-    private var islandWidth: CGFloat {
-        leadingWidth + geometry.middleGap + trailingWidth + 2 * NotchGeometry.lift.width * pulse
+    /// The waveform is only drawn while a session is open; asleep, the side empties out, the way the
+    /// dictation island empties while it thinks.
+    private var trailingWidth: CGFloat {
+        (model.connected ? Self.slotWidth : 14) + geometry.contentInset
     }
 
-    private var islandHeight: CGFloat { geometry.barHeight + NotchGeometry.lift.height * pulse }
+    /// The size the content is laid out at. It never changes while the voice speaks.
+    private var restingWidth: CGFloat { leadingWidth + geometry.middleGap + trailingWidth }
+
+    /// The size the *shape* breathes to. Rounded to whole points: a fractional frame makes SwiftUI
+    /// re-rasterise everything inside it every frame, which is what made the clock shimmer.
+    private var pulsedWidth: CGFloat { (restingWidth + 2 * NotchGeometry.lift.width * pulse).rounded() }
+    private var pulsedHeight: CGFloat { (geometry.barHeight + NotchGeometry.lift.height * pulse).rounded() }
 
     /// Only the voice's own sound lifts the island; your voice moves the bars and nothing else.
     private var pulse: CGFloat {
@@ -55,7 +66,6 @@ public struct NotchView: View {
         ZStack(alignment: .top) {
             Color.clear
             island
-                .frame(width: islandWidth, height: islandHeight)
                 .offset(x: alignmentOffset, y: geometry.topGap)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -64,27 +74,51 @@ public struct NotchView: View {
         .animation(.spring(response: 0.19, dampingFraction: 0.72), value: model.level)
         .animation(.spring(response: 0.38, dampingFraction: 0.58), value: model.voiceSpeaking)
         .animation(IslandMotion.reveal, value: model.showCost)
+        .animation(IslandMotion.morph, value: model.connected)
     }
 
+    /// The shape breathes behind content that is pinned to the resting size.
+    ///
+    /// Keeping the content out of the animating frame is the whole point: anything laid out inside a
+    /// frame that is mid-spring gets re-measured on every frame, and text re-measured at fractional
+    /// positions wobbles. The island can grow all it likes; the clock never hears about it.
     private var island: some View {
-        ZStack(alignment: .top) {
-            IslandShape(inverseRadius: geometry.inverseRadius, notchHeight: geometry.notchHeight, style: geometry.style)
-                .fill(Color(white: 0))
-                .shadow(color: .black.opacity(geometry.style == .capsule ? 0.32 : 0), radius: 7, y: 2)
-            HStack(spacing: 0) {
+        Color.clear
+            .frame(width: restingWidth, height: geometry.barHeight)
+            .background(alignment: .top) {
+                IslandShape(inverseRadius: geometry.inverseRadius, notchHeight: geometry.notchHeight, style: geometry.style)
+                    .fill(Color(white: 0))
+                    .shadow(color: .black.opacity(geometry.style == .capsule ? 0.32 : 0), radius: 7, y: 2)
+                    .frame(width: pulsedWidth, height: pulsedHeight)
+            }
+            // Clipped to the resting shape: content can never spill past the curve, whatever it grows into.
+            .overlay {
+                content.clipShape(IslandShape(inverseRadius: geometry.inverseRadius,
+                                              notchHeight: geometry.notchHeight, style: geometry.style))
+            }
+            .contentShape(Rectangle())
+            .overlay(ClickCatcher(onClick: { model.onDotClick?() },
+                                  onDoubleClick: { model.showCost.toggle() }))
+    }
+
+    private var content: some View {
+        HStack(spacing: 0) {
                 leading.frame(width: leadingWidth, alignment: .leading)
                 Color.clear.frame(width: geometry.middleGap)
-                Waveform(samples: model.samples, color: .white.opacity(model.connected ? 0.95 : 0.45))
-                    .frame(width: Self.slotWidth, height: geometry.waveHeight)
-                    .frame(width: trailingWidth, alignment: .trailing)
-                    .padding(.trailing, geometry.contentInset)
-            }
-            .frame(height: geometry.barHeight)
+                Group {
+                    if model.connected {
+                        Waveform(samples: model.samples, color: .white.opacity(0.95))
+                            .frame(width: Self.slotWidth, height: geometry.waveHeight)
+                            .transition(.opacity.combined(with: .scale(scale: 0.7, anchor: .trailing)))
+                    } else {
+                        Color.clear.frame(width: 14)
+                    }
+                }
+                // The inset is padding, not part of the slot: aligning to the slot's own trailing edge
+                // would put the waveform right on the curve, which is where it ended up once already.
+                .padding(.trailing, geometry.contentInset)
         }
-        .clipShape(IslandShape(inverseRadius: geometry.inverseRadius, notchHeight: geometry.notchHeight, style: geometry.style))
-        .contentShape(Rectangle())
-        .overlay(ClickCatcher(onClick: { model.onDotClick?() },
-                              onDoubleClick: { model.showCost.toggle() }))
+        .frame(width: restingWidth, height: geometry.barHeight)
     }
 
     @ViewBuilder private var leading: some View {

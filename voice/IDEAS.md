@@ -90,8 +90,8 @@ Taken from the old Pia's UI (`~/Desktop/lab/pia/Sources/PiaUI`, **not** P1), and
 - **The shape** (`IslandShape`, `NotchGeometry`): the black merges into the notch, or becomes a floating pill on a screen that has none.
 - **Left: the dot** (`AttentionLight`). Connected (GPT-Live session open): solid white with a glow. Not connected: a hollow ring breathing in low opacity.
 - **Next to the dot: the clock**, how long this conversation has been billed for. The cost itself is hidden until you double-click, then it appears as a quiet white hint, as in dictation. Voice time comes from `session.usage.updated` at $0.05/min, plus backend tokens if the events report them (to check). It adds up across sessions for this work.
-- **Right: the voice level** (`VoiceMeter`): five bars with the real volume, brighter when the voice speaks, resting and breathing when not connected.
-- **Speaking pulse** (the `pulse` in `IslandStates`): while the voice speaks the notch grows a little (10 pt per side, 8 pt down) with the volume, on a short spring.
+- **Right: the waveform, only while a session is open.** GPT-Live bills by the second, silence included, and a session opens when you speak and closes itself after a while of quiet. So the island is wide and moving exactly while it costs money, and narrow and breathing while it does not: you can see what you are paying for without reading the number.
+- **Speaking pulse:** while the voice speaks the island grows with its real volume, on a short spring — 26 pt per side and 8 pt down. The width has to be far larger than the height to read as the same amount of growth, because the island is ten times wider than it is tall. The content is laid out at the resting size and the shape breathes behind it, so the clock never wobbles.
 - **Always visible** while pia-voice runs, even when not connected, so you know it's alive. No cards, no text, no questions on screen.
 
 ### Two prompts

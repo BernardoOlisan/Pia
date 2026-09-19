@@ -24,7 +24,10 @@ public struct NotchGeometry: Equatable, Sendable {
     public let screenNumber: CGDirectDisplayID
 
     /// How far the island grows per side and downward at full loudness (the intent island only).
-    public static let lift = CGSize(width: 10, height: 8)
+    ///
+    /// The width has to be far bigger than the height to *read* as the same amount of growth: the
+    /// island is ten times wider than it is tall, so 10 pt sideways is invisible next to 8 pt down.
+    public static let lift = CGSize(width: 26, height: 8)
     /// Slack around the island inside its transparent window.
     public static let slack: CGFloat = 8
 
