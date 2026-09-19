@@ -142,6 +142,18 @@ public struct HotkeySpec: Equatable, CustomStringConvertible {
     public var description: String
 
     public static let `default` = HotkeySpec.parse("option+space")!
+    static let shiftBit: UInt32 = 512
+
+    /// The same shortcut with ⇧ added: the take that appends to the one before it instead of replacing it.
+    /// Nil when the shortcut already uses ⇧ and there is no free variant of it.
+    public var withShift: HotkeySpec? {
+        guard modifiers & Self.shiftBit == 0 else { return nil }
+        var parts = description.split(separator: "+").map(String.init)
+        let key = parts.popLast() ?? "space"
+        parts.append(contentsOf: ["shift", key])
+        return HotkeySpec(keyCode: keyCode, modifiers: modifiers | Self.shiftBit,
+                          description: parts.joined(separator: "+"))
+    }
 
     static let modifierBits: [String: UInt32] = [
         "cmd": 256, "command": 256, "shift": 512, "option": 2048, "opt": 2048, "alt": 2048, "ctrl": 4096, "control": 4096,

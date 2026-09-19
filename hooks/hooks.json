@@ -1,5 +1,5 @@
 {
-  "description": "PIA: restore where the work stands after compaction (PIA sessions only), stop keep-awake when the lead's session ends, and dictation (/pia:transcribe and ⌥Space) without going through Claude",
+  "description": "PIA: restore where the work stands after compaction (PIA sessions only), stop keep-awake when the lead's session ends, and dictation (/pia:transcribe[ follow] and ⌥Space / ⌥⇧Space) without going through Claude",
   "hooks": {
     "SessionStart": [
       {
@@ -23,7 +23,7 @@
     ],
     "UserPromptExpansion": [
       {
-        "matcher": "^(pia:)?transcribe$",
+        "matcher": "^(pia:)?transcribe( follow)?$",
         "hooks": [
           {
             "type": "command",

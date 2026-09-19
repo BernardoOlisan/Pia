@@ -7,6 +7,8 @@ import PiaVoiceNotch
 struct DictationOptions {
     /// Start recording as soon as it runs (the first `/pia:transcribe`).
     var recordNow = false
+    /// That first take appends to what is already in the buffer instead of replacing it.
+    var recordAppending = false
     var hotkey: HotkeySpec? = .default
     /// Keep running with no Claude Code open (manual testing).
     var stay = false
@@ -23,6 +25,8 @@ enum DictationPaths {
     static let ledger = dir.appendingPathComponent("dictation.json")
     static let recording = dir.appendingPathComponent("recording.m4a")
     static let last = dir.appendingPathComponent("last.txt")
+    /// Everything said since the last fresh take, so appending survives a restart of the daemon.
+    static let buffer = dir.appendingPathComponent("buffer.txt")
     static let failed = dir.appendingPathComponent("failed")
 }
 
@@ -46,6 +50,9 @@ final class DictationSession {
     private var ledger = DictationLedger.load(DictationPaths.ledger)
     private var state = State.idle
     private var started = Date()
+    /// Whether the take being recorded now appends to the buffer or replaces it. Fixed when it starts,
+    /// so stopping with either shortcut keeps the mode the take began with.
+    private var appending = false
     private var loudest: Float = 0
     /// Bumped on every change of what the island shows, so a late hide never hides a newer phase.
     private var generation = 0
@@ -71,8 +78,21 @@ final class DictationSession {
         model.cost = DictationLedger.label(ledger.dollars())
 
         if let spec = options.hotkey {
-            hotkey = GlobalHotkey(spec) { [weak self] in self?.toggle() }
-            log(hotkey == nil ? "shortcut \(spec) could not be registered (another app may use it)" : "shortcut \(spec) ready")
+            var bindings: [(spec: HotkeySpec, action: () -> Void)] = [
+                (spec, { [weak self] in self?.toggle() }),
+            ]
+            if let appendSpec = spec.withShift {
+                bindings.append((appendSpec, { [weak self] in self?.toggle(appendingTake: true) }))
+            }
+            hotkey = GlobalHotkey(bindings)
+            if let hotkey {
+                let taken = Set(hotkey.rejected.map(\.description))
+                let ready = bindings.map(\.spec).filter { !taken.contains($0.description) }
+                log("shortcut\(ready.count == 1 ? "" : "s") \(ready.map(\.description).joined(separator: " and ")) ready")
+                for spec in hotkey.rejected { log("shortcut \(spec) could not be registered (another app may use it)") }
+            } else {
+                log("shortcuts could not be registered (another app may use them)")
+            }
         }
         Timer.scheduledTimer(withTimeInterval: 1.0 / 20, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
@@ -81,12 +101,13 @@ final class DictationSession {
             MainActor.assumeIsolated { self?.watchClaude() }
         }
         log("ready (pid \(getpid()))")
-        if options.recordNow { toggle() }
+        if options.recordNow { toggle(appendingTake: options.recordAppending) }
     }
 
-    func toggle() {
+    /// `appendingTake` only matters when a take starts: pressing either shortcut while recording stops it.
+    func toggle(appendingTake: Bool = false) {
         switch state {
-        case .idle: startRecording()
+        case .idle: startRecording(appending: appendingTake)
         case .recording: stopRecording()
         case .transcribing: break
         }
@@ -99,7 +120,7 @@ final class DictationSession {
 
     // MARK: Recording
 
-    private func startRecording() {
+    private func startRecording(appending: Bool = false) {
         guard Secrets.openAIKey() != nil else {
             log("no OpenAI API key. Save it with: security add-generic-password -s pia-voice -a openai -w")
             finish(.failed)
@@ -122,9 +143,11 @@ final class DictationSession {
         state = .recording
         started = Date()
         loudest = 0
+        self.appending = appending
         model.reset()
+        model.appending = appending
         show(.recording)
-        log("recording")
+        log(appending ? "recording (appending)" : "recording")
     }
 
     private func stopRecording() {
@@ -162,10 +185,17 @@ final class DictationSession {
                 finish(.failed)
                 return
             }
+            // An appending take carries everything said since the last fresh one, so one paste brings
+            // the whole thought. A blank line between takes: you are stitching thoughts, not sentences.
+            let clipboard = appending
+                ? DictationBuffer.joined(previous: DictationBuffer.read(DictationPaths.buffer), take: text)
+                : text
             NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(text, forType: .string)
+            NSPasteboard.general.setString(clipboard, forType: .string)
+            try? clipboard.write(to: DictationPaths.buffer, atomically: true, encoding: .utf8)
             try? text.write(to: DictationPaths.last, atomically: true, encoding: .utf8)
-            log(String(format: "copied %d characters · %.0fs · this month %@", text.count, seconds, model.cost))
+            log(String(format: "copied %d characters%@ · %.0fs · this month %@",
+                       clipboard.count, appending ? " (appended)" : "", seconds, model.cost))
             finish(.done)
         } catch {
             try? FileManager.default.createDirectory(at: DictationPaths.failed, withIntermediateDirectories: true)

@@ -10,6 +10,8 @@ struct NotchDemoOptions {
     var forcedStyle: IslandStyle?
     /// Walk through the states on its own instead of waiting for clicks.
     var cycle = false
+    /// Show the take as an appending one ("+" beside the clock).
+    var appending = false
     var quiet = false
 }
 
@@ -41,6 +43,7 @@ final class NotchDemo {
             window = NotchWindow(model: voice, stage: stage)
         } else {
             dictation.phase = .recording
+            dictation.appending = options.appending
             dictation.onTap = { [weak self] in self?.advance() }
             window = NotchWindow(dictation: dictation, stage: stage)
         }
@@ -120,6 +123,7 @@ final class NotchDemo {
         case .failed: dictation.phase = .hidden
         case .hidden:
             dictation.reset()
+            dictation.appending = options.appending
             startedAt = Date()
             dictation.phase = .recording
         }

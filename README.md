@@ -61,6 +61,7 @@ For local development, from a clone: `claude --plugin-dir /path/to/Pia`.
 | `/pia:new <intention>` | Start a work. Keeps the machine awake, clarifies the intention, runs the team. |
 | `/pia:new --voice` | Same, but you say the intention and answer the questions by talking (macOS, notch, GPT-Live). See [voice/](voice/IDEAS.md). |
 | `/pia:transcribe` or **⌥Space** | Just dictation, no PIA: the island records until you click it (or press ⌥Space again), `gpt-transcribe` writes it, and the text is copied to your clipboard. Never reaches Claude. |
+| `/pia:transcribe follow` or **⌥⇧Space** | The same, but this take is **added** to the last one. The clipboard carries everything said since the last fresh take, one blank line between takes. |
 | `/pia:status` | Where every work stands. |
 | `/pia:continue [work]` | Resume a work after reviewing its decisions, or in a new session. |
 | `/pia:change D-017 <answer>` | Change a decision and see its impact. |
@@ -74,6 +75,11 @@ While you dictate, the island in the notch draws what Voice Memos draws: the liv
 
 - **One click** stops the take. So does ⌥Space.
 - **Two clicks** show this month's cost beside the waveform, as a quiet white hint; two more hide it again. It is hidden by default.
+- **A `+` beside the clock** means this take is being added to what you already said (⌥⇧Space).
+
+### Composing one prompt out of several takes
+
+Stop to think, then carry on: ⌥⇧Space records a take that is **added** to the last one instead of replacing it, so when you paste you get the whole thought, one blank line between takes. ⌥Space starts over. The accumulated text lives in `~/Library/Application Support/PIA Voice/buffer.txt`, so it survives a restart.
 
 ### Dictation cost
 

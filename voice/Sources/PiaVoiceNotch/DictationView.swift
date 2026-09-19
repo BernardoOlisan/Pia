@@ -16,6 +16,8 @@ public final class DictationModel {
     public var level: Float = 0
     /// How long this dictation has been running.
     public var elapsed: TimeInterval = 0
+    /// This take appends to the last one instead of replacing it. Shown as a "+" beside the clock.
+    public var appending = false
     /// The last couple of seconds of loudness, oldest first.
     public var samples: [Float] = []
     /// One click stops the recording.
@@ -37,6 +39,7 @@ public final class DictationModel {
         level = 0
         elapsed = 0
         showCost = false
+        appending = false
     }
 }
 
@@ -51,6 +54,8 @@ public struct DictationView: View {
     static let costWidth: CGFloat = 46
     /// The waveform and the clock are the same width, one each side of the notch.
     static let slotWidth: CGFloat = 38
+    /// The "+" sits outside the clock's slot, so turning it on never squeezes the digits.
+    static let plusWidth: CGFloat = 10
 
     public init(model: DictationModel, stage: IslandStage) {
         self.model = model
@@ -71,8 +76,13 @@ public struct DictationView: View {
     }
 
     private var trailingWidth: CGFloat {
-        visible ? Self.slotWidth + geometry.contentInset : 0
+        guard visible else { return 0 }
+        var width = Self.slotWidth + geometry.contentInset
+        if appendingVisible { width += Self.plusWidth }
+        return width
     }
+
+    private var appendingVisible: Bool { model.appending && model.phase == .recording }
 
     private var islandWidth: CGFloat {
         visible ? leadingWidth + geometry.middleGap + trailingWidth : geometry.foldedWidth
@@ -99,6 +109,7 @@ public struct DictationView: View {
         .ignoresSafeArea()
         .animation(IslandMotion.morph, value: model.phase)
         .animation(IslandMotion.reveal, value: costVisible)
+        .animation(IslandMotion.reveal, value: appendingVisible)
     }
 
     private var island: some View {
@@ -150,8 +161,18 @@ public struct DictationView: View {
         ZStack(alignment: .trailing) {
             switch model.phase {
             case .recording:
-                ElapsedLabel(seconds: model.elapsed)
-                    .transition(.opacity.combined(with: .scale(scale: 0.7)))
+                // "+ 0:07": this take is being added to what you already said.
+                HStack(spacing: 3) {
+                    if appendingVisible {
+                        Text("+")
+                            .font(.system(size: 11.5, weight: .regular, design: .rounded))
+                            .foregroundStyle(Palette.red)
+                            .fixedSize()
+                            .transition(.opacity.combined(with: .scale(scale: 0.6, anchor: .trailing)))
+                    }
+                    ElapsedLabel(seconds: model.elapsed)
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.7)))
             case .transcribing:
                 Spinner().transition(.opacity.combined(with: .scale(scale: 0.5)))
             case .done:

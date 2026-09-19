@@ -7,10 +7,10 @@ import PiaVoiceNotch
 enum PiaVoiceMain {
     static let usage = """
     usage: pia-voice intent <work dir> [options]
-           pia-voice dictate toggle|ensure|stop
-           pia-voice dictate serve [--record] [--hotkey <keys>|off] [--stay]
+           pia-voice dictate toggle [--append] | ensure | stop
+           pia-voice dictate serve [--record [--append]] [--hotkey <keys>|off] [--stay]
            pia-voice transcribe <audio file>
-           pia-voice notch demo [--voice] [--capsule|--notch] [--cycle]
+           pia-voice notch demo [--voice] [--capsule|--notch] [--cycle] [--append]
 
     intent: talk through a PIA intent with GPT-Live. Prints PIA-VOICE lines for the Lead on stdout.
 
@@ -25,11 +25,15 @@ enum PiaVoiceMain {
     dictate: record, transcribe with gpt-transcribe, copy the text to the clipboard.
 
       toggle                 start or stop a dictation (starts the dictation process if needed)
+        --append             this take is added to the last one instead of replacing it, so the
+                             clipboard carries everything said since the last fresh take
       ensure                 make sure the dictation process runs, and is this build
       stop                   stop the dictation process
       serve                  the dictation process itself (started by toggle and ensure)
         --record             start recording right away
-        --hotkey <keys>      global shortcut, e.g. option+space (default; also PIA_TRANSCRIBE_HOTKEY), or off
+        --append             with --record: that first take appends
+        --hotkey <keys>      global shortcut, e.g. option+space (default; also PIA_TRANSCRIBE_HOTKEY), or off.
+                             The same shortcut with ⇧ added records an appending take.
         --stay               keep running when no Claude Code is open
 
     transcribe: transcribe one audio file with gpt-transcribe and print the text (for testing).
@@ -40,6 +44,7 @@ enum PiaVoiceMain {
       --voice                the GPT-Live intent island instead of the dictation one
       --capsule / --notch    force the other screen's shape (an external monitor has no notch)
       --cycle                walk through the states on its own
+      --append               the dictation island as an appending take ("+" beside the clock)
       --quiet                no diagnostics on stderr
     """
 
@@ -107,7 +112,7 @@ enum PiaVoiceMain {
         var args = arguments
         let action = args.isEmpty ? "" : args.removeFirst()
         switch action {
-        case "toggle": exit(DictationDaemon.toggle())
+        case "toggle": exit(DictationDaemon.toggle(appending: args.contains("--append")))
         case "ensure": exit(DictationDaemon.ensure())
         case "stop": exit(DictationDaemon.stop())
         case "serve": break
@@ -120,6 +125,7 @@ enum PiaVoiceMain {
             let flag = args.removeFirst()
             switch flag {
             case "--record": options.recordNow = true
+            case "--append": options.recordAppending = true
             case "--stay": options.stay = true
             case "--hotkey":
                 guard !args.isEmpty else { fail("missing value for --hotkey") }
@@ -142,6 +148,7 @@ enum PiaVoiceMain {
         MainActor.assumeIsolated {
             let session = DictationSession(options: options)
             onSignals([SIGUSR1]) { session.toggle() }
+            onSignals([SIGUSR2]) { session.toggle(appendingTake: true) }
             onSignals([SIGTERM, SIGINT, SIGHUP]) { session.quit() }
             DispatchQueue.main.async { MainActor.assumeIsolated { session.start() } }
             retained = session
@@ -186,6 +193,7 @@ enum PiaVoiceMain {
             case "--capsule": options.forcedStyle = .capsule
             case "--notch": options.forcedStyle = .notch
             case "--cycle": options.cycle = true
+            case "--append": options.appending = true
             case "--quiet": options.quiet = true
             case let flag: fail("unknown option \(flag)\n\(usage)")
             }

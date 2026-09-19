@@ -42,12 +42,15 @@ enum DictationDaemon {
     }
 
     /// `/pia:transcribe`: tell the running daemon to start or stop, or start one already recording.
-    static func toggle() -> Int32 {
+    ///
+    /// Two signals, because the daemon has to know which kind of take to start before it starts one:
+    /// SIGUSR1 replaces what is in the clipboard, SIGUSR2 appends to it.
+    static func toggle(appending: Bool = false) -> Int32 {
         if let record = running() {
-            kill(record.pid, SIGUSR1)
+            kill(record.pid, appending ? SIGUSR2 : SIGUSR1)
             return 0
         }
-        return spawn(["--record"])
+        return spawn(appending ? ["--record", "--append"] : ["--record"])
     }
 
     /// Session start: make sure a daemon runs, and that it's this build. An older one is asked to quit
