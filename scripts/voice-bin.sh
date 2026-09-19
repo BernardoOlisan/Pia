@@ -5,11 +5,12 @@
 #   voice-bin.sh building   exit 0 while a background build runs
 #   voice-bin.sh build      build in the background (one at a time), then start the dictation process
 #
-# Swift builds into a SHARED scratch folder, not into the plugin. Every installed version of the plugin
-# is its own copy, so building in place gave each one its own ~5 GB of checkouts and intermediates, and
-# nothing was ever reused. Now the heavy tree lives once under Application Support, the finished 36 MB
-# binary is copied into the plugin where every caller already expects it, and a new version's build is
-# incremental instead of from scratch.
+# Swift builds into a SHARED scratch folder, not into the plugin, because the build tree must never
+# live inside the repo: a `directory` marketplace copies the WORKING TREE, .gitignore included, so every
+# installed version inherited whatever `.build` happened to be sitting there — five versions had piled
+# up to 8.2 GB. With the scratch path outside, the repo keeps only the 36 MB product, an installed copy
+# is 35 MB, and a new version's build is incremental against the shared tree instead of from scratch.
+# The copy also carries the finished binary, so installing usually needs no build at all.
 #
 # Build output: ~/Library/Application Support/PIA Voice/build/pia-build.log
 set -u
