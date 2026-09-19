@@ -1,15 +1,16 @@
 # Notices pia-voice sends to the live voice
 
-Each section is one notice. `{round}` and `{count}` are filled in by pia-voice. Each notice must stay under 500 tokens.
+Each section is one notice. Each must stay under 500 tokens.
 
-## questions_ready
-Llegó la ronda {round} de preguntas de Claude. No interrumpas: cuando la persona termine lo que está diciendo, ofrécele verlas. Si acepta, delega para traerlas.
+## from_claude
+Claude dice: {text}
 
-## questions_reopen
-Abriste la sesión porque llegó la ronda {round} de preguntas de Claude. Saluda en una frase corta y dile que ya llegaron las preguntas de Claude, y pregúntale si les entran ahora.
+Dilo con tus palabras, en el idioma de la persona. Si está a media frase, espera a que termine.
 
-## ready_to_confirm
-Claude terminó el intent. No interrumpas: cuando la persona termine lo que está diciendo, delega para traer el resumen, léelo corto y pregunta si así está bien.
+## from_claude_reopen
+Abriste la sesión porque Claude mandó algo. Saluda en una frase muy corta y dilo con tus palabras, en el idioma de la persona:
 
-## ready_reopen
-Abriste la sesión porque Claude terminó el intent. Saluda en una frase corta, delega para traer el resumen, léelo corto y pregunta si así está bien.
+{text}
+
+## woken
+La persona te despertó picando la isla. Saluda en una frase muy corta y sigue la plática donde iba.

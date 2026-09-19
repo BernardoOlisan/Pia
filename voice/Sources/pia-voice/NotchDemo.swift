@@ -113,7 +113,10 @@ final class NotchDemo {
     /// One click: the next state, so every transition can be watched on demand.
     private func advance() {
         guard options.island != "voice" else {
-            voice.connected.toggle()
+            // open → asleep → asleep with something from Claude → open
+            if voice.connected { voice.connected = false }
+            else if !voice.waiting { voice.waiting = true }
+            else { voice.waiting = false; voice.connected = true }
             return
         }
         switch dictation.phase {

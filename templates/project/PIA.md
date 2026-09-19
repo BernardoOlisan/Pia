@@ -138,7 +138,14 @@ One conversation that is the intention **and** the research at the same time. No
 
 **Write `talk.md` as the talk goes**, not at the end, using the `talk.md` template. Then set phase `decisions`.
 
-**By voice** (optional, `/pia:new --voice` in Claude Code on macOS): the human says the intention and answers by talking, through `pia-voice` in the notch. The rules above don't change: the lead still thinks the questions and is the only writer of `talk.md`. `pia-voice` prints lines for the lead (`PIA-VOICE INTENT`, `ANSWERS R<n>`, `CONFIRMED`, `ENDED`). The voice protocol is still round-based, so on the voice path only, the lead writes its questions under `## The conversation` as `### Round N` blocks with numbered questions and suggested answers, and adds `<!-- pia-voice: ready to confirm -->` at the top when the talk is ready to confirm. The conversation is kept in `logs/voice.md`.
+**By voice** (optional, `/pia:new --voice` in Claude Code on macOS): the same talk, out loud. You are still the brain — you read the code, ask the scout and decide what to say. `pia-voice` is your mouth and your ears, and it has no opinions of its own.
+
+- **How it works.** The voice passes on what the human said as a `PIA-VOICE SAID` line. You answer by appending **one line at a time** to `logs/voice-inbox.txt` in the work folder, and the voice says it in its own words. No rounds and no forms: write when you have something, exactly as you would type it.
+- **Write to be heard.** Everything you append is going to be spoken, so *Writing for the human* holds, plus three rules that only matter out loud: no lists or headings, because a bullet can't be heard; never a file path, a decision ID or a code name; and as long as the idea needs, but in pieces, so the human can interrupt.
+- **The island is the switch.** A session bills by the second, silence included, so it closes itself after a stretch of quiet and **speaking never reopens it**. One click on the island, or ⌥V, wakes it or puts it to sleep; two clicks show the cost, as in dictation.
+- **When you have something and the island is asleep**, the voice wakes and says it. Started with `--notify`, the island's dot turns blue and chimes once instead, and nothing is billed until the human wakes it. They can switch either way by saying so.
+- **`PIA-VOICE ENDED` means the voice stopped, not that the human left.** Unless they clearly said they are going away, the work stays `in-the-loop`: carry on in the terminal, writing normally. Out-of-the-loop is never inferred (see *When the human isn't there*).
+- The conversation is kept in `logs/voice.md`. You write `talk.md` exactly as in the typed talk.
 
 ## Phase 2: Research and decisions (scout ⇄ scout-reviewer)
 

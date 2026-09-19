@@ -18,7 +18,11 @@ public final class NotchModel {
     public var voiceSpeaking = false
     /// The last couple of seconds of loudness, oldest first.
     public var samples: [Float] = []
-    /// One click ends the voice.
+    /// Claude said something while the island was asleep, and it is holding it for you.
+    public var waiting = false
+    /// The island lights up instead of speaking when Claude has something.
+    public var notifyOnly = false
+    /// One click wakes the island, or puts it back to sleep.
     public var onDotClick: (() -> Void)?
 
     public init() {}

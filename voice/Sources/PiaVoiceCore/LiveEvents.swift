@@ -1,6 +1,6 @@
 import Foundation
 
-/// Client events for a GPT-Live primary WebSocket, with Responses delegation.
+/// Client events for a GPT-Live primary WebSocket.
 /// Shapes follow the OpenAI SDK types (`openai.types.live`).
 public enum LiveEvents {
     public static let url = URL(string: "wss://api.openai.com/v1/live/sessions")!
@@ -10,14 +10,10 @@ public enum LiveEvents {
         public var model = "gpt-live-1"
         public var voice = "marin"
         public var instructions: String
-        public var backendModel = "gpt-5.6-terra"
-        public var backendInstructions: String
         public var tools: [JSONObject]
-        public var reasoningEffort: String? = "low"
 
-        public init(instructions: String, backendInstructions: String, tools: [JSONObject]) {
+        public init(instructions: String, tools: [JSONObject]) {
             self.instructions = instructions
-            self.backendInstructions = backendInstructions
             self.tools = tools
         }
     }
@@ -26,15 +22,9 @@ public enum LiveEvents {
         "pv_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(16).lowercased()
     }
 
+    /// The voice carries its own tools. There is no second model behind it any more: Claude is the
+    /// brain, and it is reached through the tools, not through a delegated Responses model.
     public static func sessionStart(_ config: Config, history: [JSONObject]) -> JSONObject {
-        var responses: JSONObject = [
-            "model": config.backendModel,
-            "instructions": config.backendInstructions,
-            "tools": config.tools + [["type": "web_search"]],
-            "tool_choice": "auto",
-            "parallel_tool_calls": false,
-        ]
-        if let effort = config.reasoningEffort { responses["reasoning"] = ["effort": effort] }
         var session: JSONObject = [
             "model": config.model,
             "instructions": config.instructions,
@@ -42,7 +32,8 @@ public enum LiveEvents {
                 "format": ["type": "audio/pcm", "rate": sampleRate],
                 "output": ["voice": config.voice],
             ],
-            "delegation": ["type": "responses", "responses": responses],
+            "tools": config.tools,
+            "tool_choice": "auto",
             "store": false,
         ]
         if !history.isEmpty { session["input"] = history }
@@ -93,12 +84,25 @@ public enum LiveEvents {
         public let arguments: String
     }
 
+    /// Accepts both shapes: the bare `response.output_item.done` the session sends when it owns its
+    /// tools, and the same event wrapped in `response.event`, which is how it arrived when a delegated
+    /// model owned them. Reading both means a change at the other end can't silently swallow a call.
     public static func functionCall(in event: JSONObject) -> FunctionCall? {
-        guard event["type"] as? String == "response.event",
-              let inner = event["event"] as? JSONObject,
-              inner["type"] as? String == "response.output_item.done",
-              let item = inner["item"] as? JSONObject,
-              item["type"] as? String == "function_call",
+        let item: JSONObject
+        switch event["type"] as? String {
+        case "response.output_item.done":
+            guard let value = event["item"] as? JSONObject else { return nil }
+            item = value
+        case "response.event":
+            guard let inner = event["event"] as? JSONObject,
+                  inner["type"] as? String == "response.output_item.done",
+                  let value = inner["item"] as? JSONObject
+            else { return nil }
+            item = value
+        default:
+            return nil
+        }
+        guard item["type"] as? String == "function_call",
               let callID = item["call_id"] as? String,
               let name = item["name"] as? String
         else { return nil }

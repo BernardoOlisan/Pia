@@ -5,6 +5,7 @@ public enum Palette {
     public static let red = Color(red: 1, green: 0.271, blue: 0.227)
     public static let green = Color(red: 0.196, green: 0.843, blue: 0.294)
     public static let orange = Color(red: 1, green: 0.624, blue: 0.039)
+    public static let blue = Color(red: 0.039, green: 0.518, blue: 1)
 }
 
 /// How the island moves. One spring for the shape, one crossfade for what is inside it — never two

@@ -15,7 +15,10 @@ import SwiftUI
 /// and moving while it costs money, narrow and breathing while it does not. You can tell what you are
 /// paying for without reading a number.
 ///
-/// Double-click reveals the cost, exactly as it does for dictation. One click ends the voice.
+/// The dot is the state: lit while a session is open, blue when Claude is holding something for you,
+/// a quiet ring when it is asleep and there is nothing waiting.
+///
+/// One click wakes the island or puts it back to sleep. Double-click reveals the cost, as in dictation.
 public struct NotchView: View {
     @Bindable var model: NotchModel
     var stage: IslandStage
@@ -75,6 +78,7 @@ public struct NotchView: View {
         .animation(.spring(response: 0.38, dampingFraction: 0.58), value: model.voiceSpeaking)
         .animation(IslandMotion.reveal, value: model.showCost)
         .animation(IslandMotion.morph, value: model.connected)
+        .animation(IslandMotion.reveal, value: model.waiting)
     }
 
     /// The shape breathes behind content that is pinned to the resting size.
@@ -134,7 +138,7 @@ public struct NotchView: View {
                     .transition(.opacity.combined(with: .move(edge: .trailing)))
             }
             HStack(spacing: 6) {
-                AttentionLight(awake: model.connected)
+                AttentionLight(awake: model.connected, waiting: model.waiting)
                 ElapsedLabel(seconds: model.elapsed, color: .white.opacity(model.connected ? 0.9 : 0.45))
                     .frame(width: Self.slotWidth, alignment: .leading)
             }
@@ -143,24 +147,34 @@ public struct NotchView: View {
     }
 }
 
-/// Is a session open. Solid and lit when connected; a hollow ring breathing when not.
+/// The dot. Solid white while a session is open, solid blue while Claude is holding something for you,
+/// and a quiet ring breathing when it is asleep with nothing to say.
 public struct AttentionLight: View {
     public var awake: Bool
+    public var waiting: Bool
     @State private var breathing = false
 
-    public init(awake: Bool) { self.awake = awake }
+    public init(awake: Bool, waiting: Bool = false) {
+        self.awake = awake
+        self.waiting = waiting
+    }
+
+    private var filled: Bool { awake || waiting }
+    private var colour: Color { waiting && !awake ? Palette.blue : .white }
 
     public var body: some View {
         ZStack {
-            Circle().fill(Color.white.opacity(awake ? 0.95 : 0))
-            Circle().strokeBorder(Color.white.opacity(awake ? 0 : 0.45), lineWidth: 1.1)
+            Circle().fill(colour.opacity(filled ? 0.95 : 0))
+            Circle().strokeBorder(Color.white.opacity(filled ? 0 : 0.45), lineWidth: 1.1)
         }
         .frame(width: 7, height: 7)
         .frame(width: 9, height: 9)
-        .shadow(color: Color.white.opacity(awake ? 0.6 : 0), radius: awake ? 3.5 : 0)
-        .opacity(awake ? 1 : (breathing ? 0.65 : 0.3))
-        .animation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true), value: breathing)
-        .animation(.easeInOut(duration: 0.45), value: awake)
+        .shadow(color: colour.opacity(filled ? 0.6 : 0), radius: filled ? 3.5 : 0)
+        // Asleep with something waiting, it breathes brighter: visible from the corner of your eye,
+        // never the flashing of a notification.
+        .opacity(filled && !waiting ? 1 : (breathing ? (waiting ? 1 : 0.65) : (waiting ? 0.55 : 0.3)))
+        .animation(.easeInOut(duration: waiting ? 1.3 : 2.4).repeatForever(autoreverses: true), value: breathing)
+        .animation(.easeInOut(duration: 0.45), value: filled)
         .onAppear { breathing = true }
     }
 }

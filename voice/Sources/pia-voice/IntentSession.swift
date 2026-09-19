@@ -11,16 +11,23 @@ struct Options {
     var inputFiles: [URL] = []
     var showNotch = true
     var voice = "marin"
-    var backendModel = "gpt-5.6-terra"
     /// Seconds without anyone speaking before the session closes (silence is billed).
     var idleSeconds: Double = 20
+    /// What happens when Claude has something while the island is asleep.
+    var mode = VoiceBridge.Mode.speak
+    /// Wakes the island, or puts it back to sleep, without reaching for the mouse.
+    var hotkey: HotkeySpec? = HotkeySpec.parse("option+v")
 }
 
 /// The intent conversation by voice. Runs on the main thread.
 ///
-/// Local VAD hears speech → a GPT-Live session opens → the backend model takes notes through tools →
-/// lines on stdout reach the Lead → the Lead writes rounds in intent.md → pia-voice notices them →
-/// the voice asks them. Silence closes the session; a new round reopens it.
+/// Claude is the brain; this is his mouth and his ears. The voice passes on what you say with one
+/// tool, Claude writes back a line at a time, and the voice says it in its own words.
+///
+/// The session costs money by the second, silence included, so it is awake only when it should be:
+/// it opens when Claude first has something, closes itself after a stretch of quiet, and from then on
+/// only a click or the shortcut wakes it. **Speaking never wakes it** — otherwise a cough near the
+/// microphone starts billing.
 @MainActor
 final class IntentSession {
     private enum State { case idle, connecting, live, closing }
@@ -31,7 +38,10 @@ final class IntentSession {
     private let emitter = Emitter()
     private var prompts: Prompts!
     private var apiKey = ""
-    private var tools: IntentTools!
+    private var bridge: VoiceBridge!
+    private var hotkey: GlobalHotkey?
+    /// What Claude said while the island was asleep, waiting for you to wake it.
+    private var waiting: [String] = []
     private let audio = AudioIO()
     private let vad = VoiceActivity()
     private let transcript = Transcript()
@@ -40,7 +50,7 @@ final class IntentSession {
     private let notch = NotchModel()
     private var notchWindow: NotchWindow?
     private let parentWatch = ParentWatch()
-    private var intentPoller: FilePoller!
+    private var inboxPoller: FilePoller!
 
     private var state = State.idle
     private var live: LiveClient?
@@ -52,9 +62,9 @@ final class IntentSession {
     private var outgoing: [Int16] = []
     private var lastActivity = Date()
     private var lastVoiceAudio = Date.distantPast
-    private var noticedRound = 0
-    private var noticedReady = false
     private var finishing = false
+    /// True once a session has opened at least once, so the first message always speaks whatever the mode.
+    private var everOpened = false
     private var workTitle = ""
 
     init(options: Options) {
@@ -72,8 +82,12 @@ final class IntentSession {
         guard let promptsURL = Prompts.locate(override: options.promptsDir) else { fail(Prompts.LoadError.notFound.description); return }
         do { prompts = try Prompts.load(dir: promptsURL) } catch { fail("\(error)"); return }
 
-        let intentURL = IntentFile.locate(in: options.workDir)
-        tools = IntentTools(intentURL: intentURL) { [emitter] line in emitter.line(line) }
+        let inboxURL = options.workDir.appendingPathComponent("logs/voice-inbox.txt")
+        try? FileManager.default.createDirectory(at: inboxURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if !FileManager.default.fileExists(atPath: inboxURL.path) {
+            FileManager.default.createFile(atPath: inboxURL.path, contents: Data())
+        }
+        bridge = VoiceBridge(inbox: inboxURL, mode: options.mode) { [emitter] line in emitter.line(line) }
         let workID = options.workDir.lastPathComponent
         if let data = try? Data(contentsOf: options.workDir.appendingPathComponent("state.json")),
            let stateJSON = (try? JSONSerialization.jsonObject(with: data)) as? JSONObject {
@@ -83,7 +97,8 @@ final class IntentSession {
         transcript.onTurn = { [weak self] turn in self?.voiceLog.turn(turn) }
 
         if options.showNotch {
-            notch.onDotClick = { [weak self] in self?.end(reason: "dot clicked") }
+            // One click is sleep/wake, not "end": ending is something you say. Two clicks stay the cost.
+            notch.onDotClick = { [weak self] in self?.toggleAwake() }
             let window = NotchWindow(model: notch)
             window.show()
             notchWindow = window
@@ -106,15 +121,22 @@ final class IntentSession {
         parentWatch.start { [weak self] in
             MainActor.assumeIsolated { self?.end(reason: "Claude Code closed", quiet: true) }
         }
-        intentPoller = FilePoller(url: intentURL)
-        intentPoller.start { [weak self] in self?.intentChanged() }
+        if let spec = options.hotkey {
+            hotkey = GlobalHotkey([(spec, { [weak self] in self?.toggleAwake() })])
+            voiceLog.note(hotkey == nil ? "shortcut \(spec) could not be registered" : "shortcut \(spec) wakes and sleeps the island")
+        }
+        inboxPoller = FilePoller(url: inboxURL)
+        inboxPoller.start { [weak self] in self?.inboxChanged() }
         Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
 
         voiceLog.note("voice started (echo cancellation: \(audio.echoCancellation ? "on" : "off"))")
-        emitter.line("PIA-VOICE READY " + JSON.encode(["work": workID, "echo_cancellation": audio.echoCancellation]))
-        intentChanged()
+        emitter.line("PIA-VOICE READY " + JSON.encode([
+            "work": workID, "echo_cancellation": audio.echoCancellation, "mode": options.mode.rawValue,
+            "inbox": inboxURL.path,
+        ]))
+        inboxChanged()
     }
 
     /// Ends the voice before confirmation (click, signal, "no more voice", Claude closed).
@@ -122,7 +144,7 @@ final class IntentSession {
         guard !finishing else { return }
         finishing = true
         transcript.commit()
-        if !tools.confirmed && !quiet { emitter.line(tools.endedLine(reason: reason)) }
+        if !quiet { emitter.line(bridge.endedLine(reason: reason)) }
         voiceLog.note("voice ended: \(reason) · \(cost.label)")
         shutdown()
     }
@@ -155,11 +177,12 @@ final class IntentSession {
         let onset = vad.feed(f16, level: audio.inputLevel)
         if vad.speaking { lastActivity = Date() }
 
+        _ = onset
+        // Asleep on purpose: speech is heard locally for the preroll and nothing else. Only a click,
+        // the shortcut, or Claude in `speak` mode opens a session, so nothing you say can start billing.
         if state == .live {
             outgoing.append(contentsOf: pcm)
             if outgoing.count >= 960 { flushOutgoing() }
-        } else if state == .idle, onset, !finishing {
-            open(sendPreroll: true, notices: [])
         }
     }
 
@@ -185,7 +208,7 @@ final class IntentSession {
             voiceLog.note("closing session after \(Int(options.idleSeconds))s of silence")
             closeSession()
         }
-        if finishing == false, (tools?.confirmed == true || tools?.endRequested == true) {
+        if finishing == false, bridge?.ended == true {
             // Let the goodbye play, then leave.
             if !speaking, Date().timeIntervalSince(lastVoiceAudio) > 4 { finishAfterGoodbye() }
         }
@@ -204,9 +227,8 @@ final class IntentSession {
         live = client
         client.connect()
 
-        var config = LiveEvents.Config(instructions: voiceInstructions(), backendInstructions: backendInstructions(), tools: prompts.tools)
+        var config = LiveEvents.Config(instructions: voiceInstructions(), tools: prompts.tools)
         config.voice = options.voice
-        config.backendModel = options.backendModel
         client.send(LiveEvents.sessionStart(config, history: transcript.historyItems()))
         voiceLog.note("session opening")
     }
@@ -294,7 +316,8 @@ final class IntentSession {
     }
 
     private func runTool(_ call: LiveEvents.FunctionCall) {
-        let output = tools.handle(name: call.name, arguments: call.arguments)
+        let output = bridge.handle(name: call.name, arguments: call.arguments)
+        if call.name == "set_mode" { notch.notifyOnly = bridge.mode == .notify }
         voiceLog.note("tool \(call.name) \(call.arguments) → \(output)")
         live?.send(LiveEvents.functionOutput(callID: call.callID, output: output))
         live?.send(LiveEvents.responseCreate())
@@ -305,40 +328,85 @@ final class IntentSession {
         guard !finishing else { return }
         finishing = true
         transcript.commit()
-        if tools.endRequested && !tools.confirmed { emitter.line(tools.endedLine(reason: "human asked to stop voice")) }
-        voiceLog.note(tools.confirmed ? "intent confirmed · \(cost.label)" : "voice ended by the human · \(cost.label)")
+        emitter.line(bridge.endedLine(reason: bridge.endReason))
+        voiceLog.note("voice ended: \(bridge.endReason) · \(cost.label)")
         shutdown()
     }
 
-    // MARK: intent.md
+    // MARK: Claude's side of the conversation
 
-    private func intentChanged() {
-        guard let tools, !finishing else { return }
-        let file = IntentFile.read(tools.intentURL)
-        if file.readyToConfirm, !noticedReady {
-            noticedReady = true
-            notify(live: prompts.notice("ready_to_confirm"), reopen: prompts.notice("ready_reopen"))
+    /// Claude appended to the inbox. Each line is something to say.
+    private func inboxChanged() {
+        guard let bridge, !finishing else { return }
+        let messages = bridge.newMessages()
+        guard !messages.isEmpty else { return }
+        for message in messages { voiceLog.note("from claude: \(message)") }
+
+        // The very first message always speaks: you just asked for a voice, so it answering is not a
+        // surprise. After that the mode decides.
+        let speakNow = !everOpened || bridge.mode == .speak
+        guard speakNow else {
+            waiting.append(contentsOf: messages)
+            if !notch.waiting { chime() }
+            notch.waiting = true
+            voiceLog.note("holding \(waiting.count) message(s): notify mode")
             return
         }
-        if let round = file.openRound(excluding: tools.roundsSent), round.number > noticedRound {
-            noticedRound = round.number
-            notify(live: prompts.notice("questions_ready", round: round.number, count: round.unansweredCount),
-                   reopen: prompts.notice("questions_reopen", round: round.number, count: round.unansweredCount))
+        deliver(messages)
+    }
+
+    /// Says messages now, opening a session if there isn't one.
+    private func deliver(_ messages: [String]) {
+        let text = messages.joined(separator: "\n")
+        notch.waiting = false
+        waiting.removeAll()
+        switch state {
+        case .live:
+            live?.send(LiveEvents.thinking(prompts.notice("from_claude", text: text)))
+            live?.send(LiveEvents.responseCreate())
+        case .connecting:
+            pendingOnStart.append(LiveEvents.thinking(prompts.notice("from_claude", text: text)))
+        case .idle, .closing:
+            if state == .closing { live?.disconnect() }
+            open(sendPreroll: false, notices: [LiveEvents.instructions(prompts.notice("from_claude_reopen", text: text))])
         }
     }
 
-    /// In a live session: a silent notice. With no session: open one and have the voice speak first.
-    private func notify(live text: String, reopen: String) {
-        voiceLog.note("notice: \(text)")
+    // MARK: Awake and asleep
+
+    /// One click on the island, or the shortcut. Asleep → wake and deliver anything Claude is holding.
+    /// Awake → sleep, and stop the meter.
+    private func toggleAwake() {
+        guard !finishing else { return }
         switch state {
-        case .live:
-            live?.send(LiveEvents.thinking(text))
-        case .connecting:
-            pendingOnStart.append(LiveEvents.thinking(text))
+        case .live, .connecting:
+            voiceLog.note("asleep by hand · \(cost.label)")
+            closeSession()
         case .idle, .closing:
-            if state == .closing { live?.disconnect() }
-            open(sendPreroll: false, notices: [LiveEvents.instructions(reopen)])
+            if !waiting.isEmpty {
+                deliver(waiting)
+            } else {
+                notch.waiting = false
+                if state == .closing { live?.disconnect() }
+                open(sendPreroll: false, notices: [LiveEvents.instructions(prompts.notice("woken"))])
+            }
         }
+    }
+
+    /// One soft note, once, when Claude has something and the island stays quiet. Synthesised rather
+    /// than a system sound, so it never reads as a notification.
+    private func chime() {
+        let rate = Double(LiveEvents.sampleRate)
+        let seconds = 0.16
+        let samples = Int(rate * seconds)
+        var pcm = [Int16](repeating: 0, count: samples)
+        for i in 0..<samples {
+            let t = Double(i) / rate
+            let envelope = exp(-t * 26) * (t < 0.006 ? t / 0.006 : 1)   // fast in, soft out: no click
+            let tone = sin(2 * .pi * 880 * t) + 0.4 * sin(2 * .pi * 1320 * t)
+            pcm[i] = Int16(max(-1, min(1, tone / 1.4)) * envelope * 5200)
+        }
+        audio.play(pcm16: pcm.withUnsafeBufferPointer { Data(buffer: $0) })
     }
 
     // MARK: Prompts with context
@@ -346,14 +414,6 @@ final class IntentSession {
     private func voiceInstructions() -> String {
         var text = prompts.voice
         if !workTitle.isEmpty { text += "\n\n# Este trabajo\n\(workTitle)" }
-        if let intent = tools.lastIntent { text += "\n\n# Lo que ya se le mandó a Claude\n\(JSON.encode(intent))" }
-        return text
-    }
-
-    private func backendInstructions() -> String {
-        var text = prompts.backend
-        if let intent = tools.lastIntent { text += "\n\n# Already sent to Claude\nIntent: \(JSON.encode(intent))" }
-        if !tools.roundsSent.isEmpty { text += "\nAnswers already sent for rounds: \(tools.roundsSent.sorted().map(String.init).joined(separator: ", "))" }
         return text
     }
 }

@@ -1,65 +1,41 @@
 [
   {
     "type": "function",
-    "name": "send_intent",
-    "description": "Send Claude the intention as understood so far. Call as soon as it is understood, even with fields missing, and again when something important changes. Use the human's own words and language.",
+    "name": "tell_claude",
+    "description": "Say something to Claude: what the person just told you, an answer they gave, or a question you want Claude to look into. Call it whenever there is something worth passing on, in the person's own words and language. Claude answers in his own time and his answer will reach you.",
     "parameters": {
       "type": "object",
       "properties": {
-        "intention": { "type": "string", "description": "What the human wants, 1 to 4 sentences, close to their words." },
-        "why": { "type": "string", "description": "Why they want it." },
-        "done_looks_like": { "type": "string", "description": "How they will know it is done." },
-        "in_scope": { "type": "string", "description": "What is included." },
-        "out_of_scope": { "type": "string", "description": "What is explicitly not included." },
-        "constraints": { "type": "string", "description": "Constraints or preferences they stated." }
+        "text": { "type": "string", "description": "What to say to Claude, in plain sentences." }
       },
-      "required": ["intention"],
+      "required": ["text"],
       "additionalProperties": false
     }
   },
   {
     "type": "function",
-    "name": "check_questions",
-    "description": "Check talk.md for Claude's next round of questions, or whether the intent is ready to confirm. Returns status questions, ready_to_confirm or not_yet.",
-    "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
-  },
-  {
-    "type": "function",
-    "name": "send_answers",
-    "description": "Send Claude the human's answers to one round of questions, once every question of the round is answered.",
+    "name": "set_mode",
+    "description": "Change how you behave when Claude has something to say while the island is asleep. Call this when the person asks for it, e.g. 'just let me know, don't talk to me' or 'you can talk to me again'.",
     "parameters": {
       "type": "object",
       "properties": {
-        "round": { "type": "integer", "description": "The round number returned by check_questions." },
-        "answers": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "question_number": { "type": "integer" },
-              "question": { "type": "string", "description": "The question, short." },
-              "answer": { "type": "string", "description": "The human's answer, in their words." },
-              "decided_by_human": { "type": "boolean", "description": "True if the human chose it themselves; false if they only accepted the suggestion." }
-            },
-            "required": ["question_number", "answer", "decided_by_human"],
-            "additionalProperties": false
-          }
-        }
+        "mode": { "type": "string", "enum": ["speak", "notify"], "description": "speak: wake up and say it. notify: stay quiet, the island lights up instead." }
       },
-      "required": ["round", "answers"],
+      "required": ["mode"],
       "additionalProperties": false
     }
-  },
-  {
-    "type": "function",
-    "name": "confirm_intent",
-    "description": "The human clearly confirmed the final intent summary. Tells Claude to start research, then the voice ends.",
-    "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
   },
   {
     "type": "function",
     "name": "end_voice",
-    "description": "The human wants to stop using voice (prefers typing, or wants to stop). Claude continues the intent in the terminal.",
-    "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
+    "description": "End the voice. Call it when the person says they don't want to talk any more, or that they are leaving. Claude carries on in the terminal.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "reason": { "type": "string", "description": "What the person said, short." }
+      },
+      "required": ["reason"],
+      "additionalProperties": false
+    }
   }
 ]

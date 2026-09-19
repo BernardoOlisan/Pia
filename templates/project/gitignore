@@ -2,3 +2,6 @@
 *.pid
 # Lock used while reserving decision IDs
 .decision-id.lock/
+
+# The line-by-line channel between Claude and the voice, while the voice is running.
+work/*/logs/voice-inbox.txt

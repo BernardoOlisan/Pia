@@ -3,7 +3,6 @@ import Foundation
 /// The prompt files in `voice/prompts/intent/`. Kept outside the code so they can be edited without Swift.
 public struct Prompts {
     public var voice: String
-    public var backend: String
     public var tools: [JSONObject]
     public var notices: [String: String]
 
@@ -28,8 +27,7 @@ public struct Prompts {
         guard let tools = JSON.decodeAny(try text("tools.json")) as? [JSONObject] else {
             throw LoadError.unreadable("tools.json")
         }
-        return Prompts(voice: try text("voice.md"), backend: try text("backend.md"),
-                       tools: tools, notices: parseNotices(try text("notices.md")))
+        return Prompts(voice: try text("voice.md"), tools: tools, notices: parseNotices(try text("notices.md")))
     }
 
     /// `## key` sections, body until the next section.
@@ -56,10 +54,8 @@ public struct Prompts {
         return result
     }
 
-    public func notice(_ key: String, round: Int = 0, count: Int = 0) -> String {
-        (notices[key] ?? key)
-            .replacingOccurrences(of: "{round}", with: String(round))
-            .replacingOccurrences(of: "{count}", with: String(count))
+    public func notice(_ key: String, text: String = "") -> String {
+        (notices[key] ?? key).replacingOccurrences(of: "{text}", with: text)
     }
 
     /// `--prompts`, then `PIA_VOICE_PROMPTS`, then a `prompts/intent` folder above the executable.
