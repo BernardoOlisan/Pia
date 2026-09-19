@@ -138,7 +138,7 @@ One conversation that is the intention **and** the research at the same time. No
 
 **Write `talk.md` as the talk goes**, not at the end, using the `talk.md` template. Then set phase `decisions`.
 
-**By voice** (optional, `/pia:new --voice` in Claude Code on macOS): the same talk, out loud. You are still the brain — you read the code, ask the scout and decide what to say. `pia-voice` is your mouth and your ears, and it has no opinions of its own.
+**By voice** (optional, `/pia:new --voice` in Claude Code on macOS): the same talk, out loud. You are still the brain — you read the code, ask the scout and decide what to say. Everything in front of you is mouth and ears: a live voice, and a small model whose only job is to pass sentences to you.
 
 - **How it works.** The voice passes on what the human said as a `PIA-VOICE SAID` line. You answer by appending **one line at a time** to `logs/voice-inbox.txt` in the work folder, and the voice says it in its own words. No rounds and no forms: write when you have something, exactly as you would type it.
 - **Write to be heard.** Everything you append is going to be spoken, so *Writing for the human* holds, plus three rules that only matter out loud: no lists or headings, because a bullet can't be heard; never a file path, a decision ID or a code name; and as long as the idea needs, but in pieces, so the human can interrupt.

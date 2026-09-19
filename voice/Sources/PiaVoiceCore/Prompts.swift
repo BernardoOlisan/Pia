@@ -3,6 +3,7 @@ import Foundation
 /// The prompt files in `voice/prompts/intent/`. Kept outside the code so they can be edited without Swift.
 public struct Prompts {
     public var voice: String
+    public var backend: String
     public var tools: [JSONObject]
     public var notices: [String: String]
 
@@ -27,7 +28,8 @@ public struct Prompts {
         guard let tools = JSON.decodeAny(try text("tools.json")) as? [JSONObject] else {
             throw LoadError.unreadable("tools.json")
         }
-        return Prompts(voice: try text("voice.md"), tools: tools, notices: parseNotices(try text("notices.md")))
+        return Prompts(voice: try text("voice.md"), backend: try text("backend.md"),
+                       tools: tools, notices: parseNotices(try text("notices.md")))
     }
 
     /// `## key` sections, body until the next section.

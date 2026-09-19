@@ -42,18 +42,24 @@ interleave takes into the same recording and hand OpenAI a corrupt file.
 ## The talk, out loud
 
 `/pia:new --voice`. **Claude is the brain.** It reads the code, asks the scout and decides what to say.
-`pia-voice` is its mouth and its ears — it has no opinions of its own.
+Everything in front of it is mouth and ears.
 
 ```
-you ──speak──▶ GPT-Live ──tell_claude──▶ stdout ──▶ Claude (the lead)
-                   ▲                                      │
-                   └────── logs/voice-inbox.txt ◀──────────┘
+you ──speak──▶ GPT-Live ──▶ backend ──tell_claude──▶ stdout ──▶ Claude (the lead)
+                   ▲                                                 │
+                   └───────── logs/voice-inbox.txt ◀─────────────────┘
 ```
+
+There is a small model between the voice and Claude, and there has to be: **a GPT-Live session cannot
+carry its own tools.** They only exist under `delegation.responses.tools`, and a session that declares
+`tools`/`tool_choice` on itself is rejected with `Unknown parameter: 'session.tool_choice'` and never
+opens at all. What changed is its job: it used to fill in six-field notes and poll for the next round
+of questions; now it passes sentences along and nothing else.
 
 Two directions, no protocol:
 
-- **Out:** the voice calls `tell_claude(text)` and `pia-voice` prints `PIA-VOICE SAID {…}`, which
-  reaches the lead as an event.
+- **Out:** `tell_claude(text)` — free text, the person's own words — and `pia-voice` prints
+  `PIA-VOICE SAID {…}`, which reaches the lead as an event.
 - **In:** the lead appends **one line at a time** to `logs/voice-inbox.txt` in the work folder. Each
   line is something to say. The voice says it in its own words.
 
@@ -90,6 +96,14 @@ chime play — but nothing leaves this Mac and nothing is billed.
 
 The first message always speaks, whatever the mode: you just asked for a voice. You can switch either
 way mid-conversation by saying so ("just let me know, don't talk to me").
+
+### When it breaks
+
+A session that never opens is broken, not finished. `pia-voice` says so to the lead as
+`PIA-VOICE ERROR`, holds whatever the voice was about to say, and turns the dot blue so a click
+retries it. It does **not** reopen on a timer. That line is the whole point: the first time this went
+wrong the error only reached stderr, so Claude kept writing into an inbox nobody could read while the
+island sat at 0:00.
 
 ### Ending
 

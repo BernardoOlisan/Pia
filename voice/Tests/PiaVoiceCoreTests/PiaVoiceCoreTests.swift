@@ -83,8 +83,12 @@ final class VoiceBridgeTests: XCTestCase {
 }
 
 final class LiveEventsTests: XCTestCase {
-    func testSessionCarriesItsOwnToolsAndNoDelegation() {
-        var config = LiveEvents.Config(instructions: "voz", tools: [["type": "function", "name": "tell_claude"]])
+    /// Tools belong to the delegation, never to the session. A session carrying `tools`/`tool_choice`
+    /// is rejected outright with `Unknown parameter: 'session.tool_choice'`, and then the voice never
+    /// opens at all — which is exactly what happened the one time this was built the other way.
+    func testToolsLiveUnderDelegationAndNotOnTheSession() {
+        var config = LiveEvents.Config(instructions: "voz", backendInstructions: "backend",
+                                       tools: [["type": "function", "name": "tell_claude"]])
         config.voice = "marin"
         let event = LiveEvents.sessionStart(config, history: [LiveEvents.historyItem(role: "user", text: "hola")])
         XCTAssertEqual(event["type"] as? String, "session.start")
@@ -93,10 +97,16 @@ final class LiveEventsTests: XCTestCase {
         let audio = session["audio"] as! JSONObject
         XCTAssertEqual((audio["format"] as! JSONObject)["type"] as? String, "audio/pcm")
         XCTAssertEqual((audio["format"] as! JSONObject)["rate"] as? Int, 24_000)
-        XCTAssertNil(session["delegation"], "there is no second model any more: Claude is the brain")
-        let tools = session["tools"] as! [JSONObject]
+        XCTAssertNil(session["tools"], "a session may not carry tools")
+        XCTAssertNil(session["tool_choice"], "a session may not carry tool_choice")
+        let delegation = session["delegation"] as! JSONObject
+        XCTAssertEqual(delegation["type"] as? String, "responses")
+        let responses = delegation["responses"] as! JSONObject
+        XCTAssertEqual(responses["model"] as? String, "gpt-5.6-terra")
+        XCTAssertEqual(responses["tool_choice"] as? String, "auto")
+        let tools = responses["tools"] as! [JSONObject]
         XCTAssertEqual(tools.first?["name"] as? String, "tell_claude")
-        XCTAssertEqual(session["tool_choice"] as? String, "auto")
+        XCTAssertEqual(tools.last?["type"] as? String, "web_search")
         XCTAssertEqual((session["input"] as! [JSONObject]).count, 1)
     }
 
@@ -159,7 +169,7 @@ final class TranscriptAndCostTests: XCTestCase {
 
     func testNotices() {
         let n = Prompts.parseNotices("# Title\nignored\n## from_claude\nClaude dice: {text}\n\n## other\nx")
-        let p = Prompts(voice: "", tools: [], notices: n)
+        let p = Prompts(voice: "", backend: "", tools: [], notices: n)
         XCTAssertEqual(p.notice("from_claude", text: "ya vi el caché"), "Claude dice: ya vi el caché")
         XCTAssertEqual(n["other"], "x")
     }

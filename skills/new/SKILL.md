@@ -73,7 +73,7 @@ If the arguments contain `--voice`, the human talks and you answer through the n
    - `PIA-VOICE SAID {"text": …}`: what the human said. Treat it exactly as if they had typed it — record decisions under *Decided by you*, ask the scout, and answer through the inbox.
    - `PIA-VOICE MODE {"mode": …}`: they switched between speaking and signalling. Nothing to do but log it.
    - `PIA-VOICE ENDED {"reason": …}`: **the voice stopped, not the human.** Unless the reason clearly says they are leaving, stay `in-the-loop` and carry on in the terminal, writing normally again. If it does say they are leaving, follow PIA.md → Phase 1 → *When the human isn't there*.
-   - `PIA-VOICE ERROR {"message": …}`: tell the human in one line and carry on in the terminal.
+   - `PIA-VOICE ERROR {"message": …}`: the voice is broken, not finished. **Stop appending to the inbox** — nothing written there will be heard. Tell the human in one line, in plain words, and carry on in the terminal.
 6. If the human types in the terminal while the voice runs, that is an answer too. To stop the voice, stop the Monitor task: `pia-voice` prints `PIA-VOICE ENDED` and exits.
 
 ## 4. Lead the team (PIA.md → Team, Phases 2 to 4)

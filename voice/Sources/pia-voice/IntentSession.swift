@@ -17,6 +17,9 @@ struct Options {
     var mode = VoiceBridge.Mode.speak
     /// Wakes the island, or puts it back to sleep, without reaching for the mouse.
     var hotkey: HotkeySpec? = HotkeySpec.parse("option+v")
+    /// The model that carries sentences to Claude. Tools only exist under delegation, so it has to be there.
+    var backendModel = "gpt-5.6-terra"
+
 }
 
 /// The intent conversation by voice. Runs on the main thread.
@@ -65,6 +68,11 @@ final class IntentSession {
     private var finishing = false
     /// True once a session has opened at least once, so the first message always speaks whatever the mode.
     private var everOpened = false
+    /// This attempt reached `session.started`. A socket that closes before that is a failure, not an end.
+    private var reachedLive = false
+    /// What the voice was about to say when the session failed, so it isn't lost.
+    private var undelivered: [String] = []
+    private var toldLeadAboutFailure = false
     private var workTitle = ""
 
     init(options: Options) {
@@ -218,6 +226,7 @@ final class IntentSession {
 
     private func open(sendPreroll: Bool, notices: [JSONObject]) {
         state = .connecting
+        reachedLive = false
         sendPrerollOnStart = sendPreroll
         pendingOnStart = notices
         lastActivity = Date()
@@ -227,8 +236,10 @@ final class IntentSession {
         live = client
         client.connect()
 
-        var config = LiveEvents.Config(instructions: voiceInstructions(), tools: prompts.tools)
+        var config = LiveEvents.Config(instructions: voiceInstructions(),
+                                       backendInstructions: prompts.backend, tools: prompts.tools)
         config.voice = options.voice
+        config.backendModel = options.backendModel
         client.send(LiveEvents.sessionStart(config, history: transcript.historyItems()))
         voiceLog.note("session opening")
     }
@@ -247,10 +258,21 @@ final class IntentSession {
 
     private func socketClosed(_ reason: String) {
         if state != .idle { emitter.debug("socket closed: \(reason)") }
+        let failed = !reachedLive && state != .idle
         cost.closeSession(finalSeconds: nil)
         live = nil
         state = .idle
         notch.connected = false
+        // A session that never opened is broken, not finished. Don't reopen on a timer: hold what the
+        // voice was going to say, light the island, and let the human retry with a click.
+        if failed {
+            reportFailure(reason)
+            if !undelivered.isEmpty {
+                waiting.append(contentsOf: undelivered)
+                undelivered = []
+                notch.waiting = true
+            }
+        }
         outgoing.removeAll()
         audio.flushPlayback()
         transcript.commit()
@@ -261,6 +283,9 @@ final class IntentSession {
         switch type {
         case "session.started":
             state = .live
+            reachedLive = true
+            everOpened = true
+            undelivered = []
             notch.connected = true
             lastActivity = Date()
             if sendPrerollOnStart { outgoing = preroll; flushOutgoing() }
@@ -309,6 +334,7 @@ final class IntentSession {
             let message = "\(error["code"] as? String ?? "error"): \(error["message"] as? String ?? "")"
             emitter.debug(message)
             voiceLog.note("error · \(message)")
+            reportFailure(message)
 
         default:
             break
@@ -360,6 +386,7 @@ final class IntentSession {
         let text = messages.joined(separator: "\n")
         notch.waiting = false
         waiting.removeAll()
+        undelivered = messages
         switch state {
         case .live:
             live?.send(LiveEvents.thinking(prompts.notice("from_claude", text: text)))
@@ -391,6 +418,17 @@ final class IntentSession {
                 open(sendPreroll: false, notices: [LiveEvents.instructions(prompts.notice("woken"))])
             }
         }
+    }
+
+    /// Tell the Lead the voice is broken. It used to go to stderr only, so Claude kept writing lines
+    /// into an inbox nobody could read and the human just saw an island that never woke up.
+    private func reportFailure(_ message: String) {
+        guard !toldLeadAboutFailure, !finishing else { return }
+        toldLeadAboutFailure = true
+        emitter.line("PIA-VOICE ERROR " + JSON.encode([
+            "message": message,
+            "note": "the voice could not open a session; tell the human in one line and carry on in the terminal",
+        ]))
     }
 
     /// One soft note, once, when Claude has something and the island stays quiet. Synthesised rather

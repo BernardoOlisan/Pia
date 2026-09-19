@@ -18,6 +18,7 @@ enum PiaVoiceMain {
       --notify               when Claude has something and the island is asleep, light the island and
                              chime instead of speaking. Nothing is billed until you wake it.
       --hotkey <keys>        shortcut that wakes the island or puts it to sleep (default option+v), or off
+      --backend-model <m>    the model that carries sentences to Claude (default: gpt-5.6-terra)
       --prompts <dir>        prompts folder (default: voice/prompts/intent next to the build)
       --input-file <audio>   test mode: speech from audio files instead of the microphone; repeat it
                              for several turns, each played after the voice stops talking
@@ -86,6 +87,7 @@ enum PiaVoiceMain {
             case "--input-file": options.inputFiles.append(URL(fileURLWithPath: value()))
             case "--no-notch": options.showNotch = false
             case "--voice": options.voice = value()
+            case "--backend-model": options.backendModel = value()
             case "--notify": options.mode = .notify
             case "--hotkey":
                 let text = value()
