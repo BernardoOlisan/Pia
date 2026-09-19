@@ -168,6 +168,11 @@ public struct DictationView: View {
                             .font(.system(size: 11.5, weight: .regular, design: .rounded))
                             .foregroundStyle(Palette.red)
                             .fixedSize()
+                            // Centring two text views centres their boxes, not their ink. A "+" is drawn
+                            // on the font's math axis and digits on the baseline, so the boxes line up
+                            // and the glyphs don't: measured on screen, the "+" sat 1 pt below the
+                            // middle of the digits. This is that 1 pt.
+                            .offset(y: -1)
                             .transition(.opacity.combined(with: .scale(scale: 0.6, anchor: .trailing)))
                     }
                     ElapsedLabel(seconds: model.elapsed)
