@@ -60,6 +60,7 @@ final class DictationSession {
         try? FileManager.default.createDirectory(at: DictationPaths.dir, withIntermediateDirectories: true)
         DictationDaemon.writeRecord()
         window = NotchWindow(dictation: model)
+        window.diagnostics = { [weak self] line in self?.log("island · " + line) }
         model.onTap = { [weak self] in
             guard let self, self.state == .recording else { return }
             self.stopRecording()
@@ -70,7 +71,7 @@ final class DictationSession {
             hotkey = GlobalHotkey(spec) { [weak self] in self?.toggle() }
             log(hotkey == nil ? "shortcut \(spec) could not be registered (another app may use it)" : "shortcut \(spec) ready")
         }
-        Timer.scheduledTimer(withTimeInterval: 1.0 / 15, repeats: true) { [weak self] _ in
+        Timer.scheduledTimer(withTimeInterval: 1.0 / 20, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
         Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
@@ -118,6 +119,7 @@ final class DictationSession {
         state = .recording
         started = Date()
         loudest = 0
+        model.reset()
         show(.recording)
         log("recording")
     }
@@ -177,8 +179,9 @@ final class DictationSession {
         guard state == .recording, let audio else { return }
         let level = audio.inputLevel
         loudest = max(loudest, level)
-        model.level = level
+        model.push(level: level)
         let elapsed = Date().timeIntervalSince(started)
+        model.elapsed = elapsed
         let label = DictationLedger.label(ledger.dollars(pendingSeconds: elapsed))
         if model.cost != label { model.cost = label }
         if elapsed >= options.maxSeconds {
@@ -191,10 +194,12 @@ final class DictationSession {
 
     private func show(_ phase: DictationModel.Phase) {
         generation += 1
+        let wasHidden = model.phase == .hidden
         window.show()
-        if model.phase == .hidden {
-            // Let the island draw once folded into the notch, so it unfolds instead of appearing.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { [weak self] in self?.model.phase = phase }
+        if wasHidden {
+            // The island has to draw once folded into the notch before it can unfold out of it.
+            // One turn of the main queue is exactly that, and it doesn't guess at a duration.
+            DispatchQueue.main.async { [weak self] in self?.model.phase = phase }
         } else {
             model.phase = phase
         }

@@ -6,7 +6,7 @@ Voice is an optional feature, not the core. PIA works exactly the same without i
 
 Status: feature 1 is built (`/pia:new --voice`, Swift package in this folder). Features 2 and 3 are written down so they aren't lost.
 
-Also built, apart from PIA: **dictation** (`/pia:transcribe` or ⌥Space). `pia-voice dictate serve` runs while Claude Code is open (started by a SessionStart hook), records to .m4a, transcribes with `gpt-transcribe` ($0.0045/min) and copies the text to the clipboard. The notch shows a red dot while recording and this month's cost. A `UserPromptExpansion` hook blocks `/pia:transcribe` with exit 2, so Claude never sees it. Change the shortcut with `PIA_TRANSCRIBE_HOTKEY` (e.g. `ctrl+shift+d`, or `off`). Files: `~/Library/Application Support/PIA Voice/`. The cost resets every month; to reset it sooner, see *Dictation cost* in the README (alias `pia-transcribe-reset`).
+Also built, apart from PIA: **dictation** (`/pia:transcribe` or ⌥Space). `pia-voice dictate serve` runs while Claude Code is open (started by a SessionStart hook), records to .m4a, transcribes with `gpt-transcribe` ($0.0045/min) and copies the text to the clipboard. The island shows the live waveform and the elapsed time, in red, the way Voice Memos does; this month's cost is hidden until you double-click it. It follows you across screens and Desktops, and on a screen with no notch it floats as a pill. A `UserPromptExpansion` hook blocks `/pia:transcribe` with exit 2, so Claude never sees it. Change the shortcut with `PIA_TRANSCRIBE_HOTKEY` (e.g. `ctrl+shift+d`, or `off`). Files: `~/Library/Application Support/PIA Voice/`. The cost resets every month; to reset it sooner, see *Dictation cost* in the README (alias `pia-transcribe-reset`).
 
 **Setup:** save the OpenAI key in the Keychain (`security add-generic-password -s pia-voice -a openai -w`; `OPENAI_API_KEY` also works). The binary is built on first use with `swift build -c release --package-path voice`. Needs macOS 26.
 
@@ -87,9 +87,9 @@ Lines printed for the Lead: `PIA-VOICE INTENT {…}`, `PIA-VOICE ANSWERS R1 {…
 
 Taken from the old Pia's UI (`~/Desktop/lab/pia/Sources/PiaUI`, **not** P1), and only these pieces:
 
-- **The shape** (`IslandShape`, `NotchGeometry`): the black merges into the notch.
+- **The shape** (`IslandShape`, `NotchGeometry`): the black merges into the notch, or becomes a floating pill on a screen that has none.
 - **Left: the dot** (`AttentionLight`). Connected (GPT-Live session open): solid white with a glow. Not connected: a hollow ring breathing in low opacity.
-- **Next to the dot: the cost so far**, just the number: `$0.00`. Voice time from `session.usage.updated` at $0.05/min, plus backend tokens if the events report them (to check). It adds up across sessions for this work.
+- **Next to the dot: the clock**, how long this conversation has been billed for. The cost itself is hidden until you double-click, then it appears as a quiet white hint, as in dictation. Voice time comes from `session.usage.updated` at $0.05/min, plus backend tokens if the events report them (to check). It adds up across sessions for this work.
 - **Right: the voice level** (`VoiceMeter`): five bars with the real volume, brighter when the voice speaks, resting and breathing when not connected.
 - **Speaking pulse** (the `pulse` in `IslandStates`): while the voice speaks the notch grows a little (10 pt per side, 8 pt down) with the volume, on a short spring.
 - **Always visible** while pia-voice runs, even when not connected, so you know it's alive. No cards, no text, no questions on screen.
@@ -119,7 +119,7 @@ voice/
     ├── Tools/               ← what happens when the model calls each tool
     ├── Bridge/              ← prints lines for the Lead, watches intent.md and CLAUDE_PID
     ├── Audio/               ← microphone, speaker, VAD (Silero)
-    └── Notch/               ← shape, dot, cost, meter, pulse (from the old Pia)
+    └── Notch/               ← shape, waveform, clock, cost, pulse; follows screens and Spaces
 ```
 
 Prompts live in their own files, not in code, so they can be read and changed without touching Swift. `intent/` is its own folder because features 2 and 3 will have their own prompts.

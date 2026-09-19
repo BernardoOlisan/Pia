@@ -1,146 +1,132 @@
 import AppKit
 import SwiftUI
 
-/// The island, from the old Pia (`Sources/PiaUI`): the notch shape, a dot and the cost on the left,
-/// the voice meter on the right, and a small pulse while the voice speaks.
-struct NotchView: View {
+/// The intent island: PIA's voice, alive for as long as the work's intent conversation lasts.
+///
+/// It is deliberately the same shape and the same two slots as the dictation island, and deliberately
+/// a different colour, so a glance tells you which one is running. Dictation is red and counts a take;
+/// the voice is white and counts a conversation.
+///
+/// Left: a dot for whether a session is open, and the time this conversation has been billed for.
+/// Right: the live waveform — your voice, and the voice answering.
+/// Double-click reveals the cost, exactly as it does for dictation. One click ends the voice.
+public struct NotchView: View {
     @Bindable var model: NotchModel
-    let geometry: NotchGeometry
+    var stage: IslandStage
 
-    var body: some View {
+    public static let maxSideWidth: CGFloat = 20 + dotWidth + 6 + slotWidth + 7 + costWidth
+    static let dotWidth: CGFloat = 9
+    /// The waveform and the clock are the same width, one each side of the notch.
+    static let slotWidth: CGFloat = 38
+    static let costWidth: CGFloat = 44
+
+    public init(model: NotchModel, stage: IslandStage) {
+        self.model = model
+        self.stage = stage
+    }
+
+    private var geometry: NotchGeometry { stage.geometry }
+
+    private var leadingWidth: CGFloat {
+        var width = geometry.contentInset + Self.dotWidth + 6 + Self.slotWidth
+        if model.showCost { width += 7 + Self.costWidth }
+        return width
+    }
+
+    private var trailingWidth: CGFloat { Self.slotWidth + geometry.contentInset }
+
+    /// Resting width, plus the lift while the voice speaks, scaled by its real loudness.
+    private var islandWidth: CGFloat {
+        leadingWidth + geometry.middleGap + trailingWidth + 2 * NotchGeometry.lift.width * pulse
+    }
+
+    private var islandHeight: CGFloat { geometry.barHeight + NotchGeometry.lift.height * pulse }
+
+    /// Only the voice's own sound lifts the island; your voice moves the bars and nothing else.
+    private var pulse: CGFloat {
+        model.voiceSpeaking ? CGFloat(min(1, max(0, model.level))) : 0
+    }
+
+    private var alignmentOffset: CGFloat {
+        geometry.style == .notch ? (trailingWidth - leadingWidth) / 2 : 0
+    }
+
+    public var body: some View {
         ZStack(alignment: .top) {
             Color.clear
-            island.frame(width: size.width, height: size.height)
+            island
+                .frame(width: islandWidth, height: islandHeight)
+                .offset(x: alignmentOffset, y: geometry.topGap)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        // The window sits over the notch, which is outside the safe area; without this SwiftUI pushes the island down and out of view.
         .ignoresSafeArea()
         // The pulse gets a short spring so it breathes with syllables instead of twitching.
         .animation(.spring(response: 0.19, dampingFraction: 0.72), value: model.level)
         .animation(.spring(response: 0.38, dampingFraction: 0.58), value: model.voiceSpeaking)
-    }
-
-    /// Resting size, plus the lift while the voice speaks, scaled by its real loudness.
-    var size: CGSize {
-        var box = geometry.restingSize
-        let pulse = model.voiceSpeaking ? CGFloat(min(1, max(0, model.level))) : 0
-        box.width += 2 * NotchGeometry.lift.width * pulse
-        box.height += NotchGeometry.lift.height * pulse
-        return box
+        .animation(IslandMotion.reveal, value: model.showCost)
     }
 
     private var island: some View {
         ZStack(alignment: .top) {
-            IslandShape(inverseRadius: geometry.inverseRadius, notchHeight: geometry.notchHeight)
+            IslandShape(inverseRadius: geometry.inverseRadius, notchHeight: geometry.notchHeight, style: geometry.style)
                 .fill(Color(white: 0))
+                .shadow(color: .black.opacity(geometry.style == .capsule ? 0.32 : 0), radius: 7, y: 2)
             HStack(spacing: 0) {
-                HStack(spacing: 5) {
-                    AttentionLight(awake: model.connected)
-                    Text(model.cost)
-                        .font(Font.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundStyle(Color.white.opacity(model.connected ? 0.85 : 0.45))
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.leading, NotchGeometry.inset)
-                .contentShape(Rectangle())
-                .onTapGesture { model.onDotClick?() }
-                Color.clear.frame(width: geometry.notchWidth)
-                VoiceMeter(level: model.level, speaking: model.voiceSpeaking, asleep: !model.connected)
-                    .frame(width: NotchGeometry.meterWidth, height: NotchGeometry.meterHeight)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .padding(.trailing, NotchGeometry.inset)
+                leading.frame(width: leadingWidth, alignment: .leading)
+                Color.clear.frame(width: geometry.middleGap)
+                Waveform(samples: model.samples, color: .white.opacity(model.connected ? 0.95 : 0.45))
+                    .frame(width: Self.slotWidth, height: geometry.waveHeight)
+                    .frame(width: trailingWidth, alignment: .trailing)
+                    .padding(.trailing, geometry.contentInset)
             }
-            .padding(.horizontal, geometry.inverseRadius)
-            .frame(height: geometry.restingSize.height)
+            .frame(height: geometry.barHeight)
         }
-        .clipShape(IslandShape(inverseRadius: geometry.inverseRadius, notchHeight: geometry.notchHeight))
+        .clipShape(IslandShape(inverseRadius: geometry.inverseRadius, notchHeight: geometry.notchHeight, style: geometry.style))
+        .contentShape(Rectangle())
+        .overlay(ClickCatcher(onClick: { model.onDotClick?() },
+                              onDoubleClick: { model.showCost.toggle() }))
+    }
+
+    @ViewBuilder private var leading: some View {
+        HStack(spacing: 7) {
+            if model.showCost {
+                Text(model.cost)
+                    .font(.system(size: 11, weight: .regular, design: .rounded).monospacedDigit())
+                    .foregroundStyle(Color.white.opacity(0.4))
+                    .contentTransition(.numericText())
+                    .lineLimit(1)
+                    .fixedSize()
+                    .frame(width: Self.costWidth, alignment: .leading)
+                    .transition(.opacity.combined(with: .move(edge: .trailing)))
+            }
+            HStack(spacing: 6) {
+                AttentionLight(awake: model.connected)
+                ElapsedLabel(seconds: model.elapsed, color: .white.opacity(model.connected ? 0.9 : 0.45))
+                    .frame(width: Self.slotWidth, alignment: .leading)
+            }
+        }
+        .padding(.leading, geometry.contentInset)
     }
 }
 
-/// Left: is a session open. Solid and lit when connected; a hollow ring breathing when not.
-struct AttentionLight: View {
-    let awake: Bool
+/// Is a session open. Solid and lit when connected; a hollow ring breathing when not.
+public struct AttentionLight: View {
+    public var awake: Bool
     @State private var breathing = false
 
-    var body: some View {
+    public init(awake: Bool) { self.awake = awake }
+
+    public var body: some View {
         ZStack {
-            Circle().fill(Color.white.opacity(awake ? 0.92 : 0))
+            Circle().fill(Color.white.opacity(awake ? 0.95 : 0))
             Circle().strokeBorder(Color.white.opacity(awake ? 0 : 0.45), lineWidth: 1.1)
         }
         .frame(width: 7, height: 7)
+        .frame(width: 9, height: 9)
         .shadow(color: Color.white.opacity(awake ? 0.6 : 0), radius: awake ? 3.5 : 0)
         .opacity(awake ? 1 : (breathing ? 0.65 : 0.3))
         .animation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true), value: breathing)
         .animation(.easeInOut(duration: 0.45), value: awake)
         .onAppear { breathing = true }
-    }
-}
-
-/// Right: five bars driven by real loudness, never a canned animation.
-struct VoiceMeter: View {
-    let level: Float
-    let speaking: Bool
-    let asleep: Bool
-    @State private var breathing = false
-
-    static let profile: [CGFloat] = [0.60, 1.0, 0.72, 0.92, 0.55]
-    static let floorFraction: CGFloat = 0.14
-
-    var heights: [CGFloat] {
-        Self.profile.map { weight in
-            asleep ? Self.floorFraction : min(1, max(Self.floorFraction, CGFloat(level) * weight))
-        }
-    }
-
-    var body: some View {
-        Canvas { context, size in
-            let heights = self.heights
-            let barWidth = size.width / CGFloat(heights.count)
-            let inset = barWidth * 0.34
-            for (index, fraction) in heights.enumerated() {
-                let height = max(2, fraction * size.height)
-                let rect = CGRect(x: CGFloat(index) * barWidth + inset / 2, y: (size.height - height) / 2,
-                                  width: max(1, barWidth - inset), height: height)
-                context.fill(Path(roundedRect: rect, cornerRadius: rect.width / 2),
-                             with: .color(Color.white.opacity(speaking ? 0.95 : 0.7)))
-            }
-        }
-        .opacity(asleep ? (breathing ? 0.5 : 0.22) : 1)
-        .animation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true), value: breathing)
-        .animation(.easeInOut(duration: 0.45), value: asleep)
-        .onAppear { breathing = true }
-    }
-}
-
-/// The black shape: flat top, concave joins that melt into the menu bar, convex bottom corners.
-struct IslandShape: Shape {
-    let inverseRadius: CGFloat
-    var notchHeight: CGFloat = 0
-
-    static func bottomRadius(forHeight height: CGFloat, notchHeight: CGFloat) -> CGFloat {
-        guard notchHeight > 0 else { return min(max(height * 0.5, 12), 28) }
-        let notch = notchHeight * 0.25
-        return min(28, notch * height / notchHeight)
-    }
-
-    func path(in rect: CGRect) -> Path {
-        let ir = min(inverseRadius, rect.width / 4)
-        let r = min(Self.bottomRadius(forHeight: rect.height, notchHeight: notchHeight), (rect.width - 2 * ir) / 2)
-        let left = rect.minX + ir, right = rect.maxX - ir
-        let top = rect.minY, bottom = rect.maxY
-        var path = Path()
-        path.move(to: CGPoint(x: rect.minX, y: top))
-        path.addLine(to: CGPoint(x: rect.maxX, y: top))
-        path.addQuadCurve(to: CGPoint(x: right, y: top + ir), control: CGPoint(x: right, y: top))
-        path.addLine(to: CGPoint(x: right, y: bottom - r))
-        path.addQuadCurve(to: CGPoint(x: right - r, y: bottom), control: CGPoint(x: right, y: bottom))
-        path.addLine(to: CGPoint(x: left + r, y: bottom))
-        path.addQuadCurve(to: CGPoint(x: left, y: bottom - r), control: CGPoint(x: left, y: bottom))
-        path.addLine(to: CGPoint(x: left, y: top + ir))
-        path.addQuadCurve(to: CGPoint(x: rect.minX, y: top), control: CGPoint(x: left, y: top))
-        path.closeSubpath()
-        return path
     }
 }

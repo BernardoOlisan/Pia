@@ -2,176 +2,226 @@ import AppKit
 import Observation
 import SwiftUI
 
-/// What the notch shows while dictating. Updated on the main thread by the dictation session.
+/// What the island shows while dictating. Updated on the main thread by the dictation session.
 @Observable
 public final class DictationModel {
     public enum Phase: Equatable { case hidden, recording, transcribing, done, failed }
 
     public var phase = Phase.hidden
-    /// This month's dictation cost, live while recording: "$0.004".
+    /// This month's dictation cost, live while recording: "$0.004". Hidden unless asked for.
     public var cost = "$0.000"
-    /// 0...1 microphone loudness.
+    /// Double-clicking the island shows the cost beside the waveform; double-clicking again hides it.
+    public var showCost = false
+    /// 0...1 microphone loudness, for the bar being drawn right now.
     public var level: Float = 0
-    /// Clicking the island stops the recording.
+    /// How long this dictation has been running.
+    public var elapsed: TimeInterval = 0
+    /// The last couple of seconds of loudness, oldest first.
+    public var samples: [Float] = []
+    /// One click stops the recording.
     public var onTap: (() -> Void)?
 
     public init() {}
+
+    /// Called by the session on every tick.
+    public func push(level: Float) {
+        self.level = level
+        samples.append(level)
+        if samples.count > Waveform.capacity { samples.removeFirst(samples.count - Waveform.capacity) }
+    }
+
+    /// A new take starts clean, and that includes the cost: it is revealed for the take you are
+    /// looking at, never left on for the next one.
+    public func reset() {
+        samples = []
+        level = 0
+        elapsed = 0
+        showCost = false
+    }
 }
 
-/// The same island as the intent, for dictation: it unfolds from the notch, a red dot breathes while it
-/// records, a small ring spins while it transcribes, a green check when the text is in the clipboard.
-struct DictationView: View {
+/// The dictation island, drawn the way Voice Memos draws a recording: the live waveform on one side of
+/// the notch, the elapsed time on the other, both in red. The cost is not shown unless you ask for it.
+public struct DictationView: View {
     @Bindable var model: DictationModel
-    let geometry: NotchGeometry
+    var stage: IslandStage
 
-    static let leftContentWidth: CGFloat = 50
+    /// Room for the widest side: the inset, the waveform, and the cost when it is revealed.
+    public static let maxSideWidth: CGFloat = 20 + slotWidth + 7 + costWidth
+    static let costWidth: CGFloat = 46
+    /// The waveform and the clock are the same width, one each side of the notch.
+    static let slotWidth: CGFloat = 38
 
+    public init(model: DictationModel, stage: IslandStage) {
+        self.model = model
+        self.stage = stage
+    }
+
+    private var geometry: NotchGeometry { stage.geometry }
     private var visible: Bool { model.phase != .hidden }
+    private var costVisible: Bool { model.showCost && (model.phase == .recording || model.phase == .transcribing) }
 
-    /// Folded into the notch when hidden. It never pulses: the island only grows with sound the computer plays
-    /// (the AI's voice); your voice moves the bars and nothing else.
-    var size: CGSize { visible ? geometry.restingSize : geometry.foldedSize }
+    /// The side that holds the sound, and the side that holds the state.
+    private var leadingWidth: CGFloat {
+        guard visible else { return 0 }
+        var width = geometry.contentInset
+        if costVisible { width += Self.costWidth + 7 }
+        width += model.phase == .recording ? Self.slotWidth : 14
+        return width
+    }
 
-    var body: some View {
+    private var trailingWidth: CGFloat {
+        visible ? Self.slotWidth + geometry.contentInset : 0
+    }
+
+    private var islandWidth: CGFloat {
+        visible ? leadingWidth + geometry.middleGap + trailingWidth : geometry.foldedWidth
+    }
+
+    /// The island is centred on the notch, not on itself, so the wider side grows outwards.
+    private var alignmentOffset: CGFloat {
+        geometry.style == .notch ? (trailingWidth - leadingWidth) / 2 : 0
+    }
+
+    public var body: some View {
         ZStack(alignment: .top) {
             Color.clear
             island
-                .frame(width: size.width, height: size.height)
-                // Without a notch there is nothing to fold into: fade instead.
-                .opacity(visible || geometry.notchHeight > 0 ? 1 : 0)
+                .frame(width: islandWidth, height: geometry.barHeight)
+                .offset(x: alignmentOffset, y: geometry.topGap)
+                // A notch island folds into the notch. A capsule has nothing to fold into, so it
+                // drops in and lifts away instead.
+                .scaleEffect(visible || geometry.style == .notch ? 1 : 0.8, anchor: .top)
+                .opacity(visible || geometry.style == .notch ? 1 : 0)
+                .offset(y: visible || geometry.style == .notch ? 0 : -6)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .ignoresSafeArea()
-        .animation(.spring(response: 0.42, dampingFraction: 0.8), value: model.phase)
+        .animation(IslandMotion.morph, value: model.phase)
+        .animation(IslandMotion.reveal, value: costVisible)
     }
 
     private var island: some View {
         ZStack(alignment: .top) {
-            IslandShape(inverseRadius: geometry.inverseRadius, notchHeight: geometry.notchHeight)
+            IslandShape(inverseRadius: geometry.inverseRadius, notchHeight: geometry.notchHeight, style: geometry.style)
                 .fill(Color(white: 0))
+                .shadow(color: .black.opacity(geometry.style == .capsule ? 0.32 : 0), radius: 7, y: 2)
             HStack(spacing: 0) {
-                HStack(spacing: 6) {
-                    StatusGlyph(phase: model.phase)
-                    Text(model.cost)
-                        .font(.system(size: 10.5, weight: .semibold, design: .rounded).monospacedDigit())
-                        .foregroundStyle(Color.white.opacity(model.phase == .recording ? 0.9 : 0.6))
-                        .contentTransition(.numericText())
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.leading, NotchGeometry.inset)
-                Color.clear.frame(width: geometry.notchWidth)
-                rightSide
-                    .frame(width: NotchGeometry.meterWidth, height: NotchGeometry.meterHeight)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .padding(.trailing, NotchGeometry.inset)
+                leading.frame(width: leadingWidth, alignment: .leading)
+                Color.clear.frame(width: geometry.middleGap)
+                trailing.frame(width: trailingWidth, alignment: .trailing)
             }
-            .padding(.horizontal, geometry.inverseRadius)
-            .frame(height: geometry.restingSize.height)
+            .frame(height: geometry.barHeight)
             .opacity(visible ? 1 : 0)
-            .blur(radius: visible ? 0 : 3)
-            .animation(.easeOut(duration: visible ? 0.28 : 0.12).delay(visible ? 0.1 : 0), value: visible)
+            .animation(IslandMotion.content, value: visible)
         }
-        .clipShape(IslandShape(inverseRadius: geometry.inverseRadius, notchHeight: geometry.notchHeight))
+        .clipShape(IslandShape(inverseRadius: geometry.inverseRadius, notchHeight: geometry.notchHeight, style: geometry.style))
         .contentShape(Rectangle())
-        .onTapGesture { model.onTap?() }
+        .overlay(ClickCatcher(onClick: { model.onTap?() },
+                              onDoubleClick: { model.showCost.toggle() }))
     }
 
-    @ViewBuilder private var rightSide: some View {
-        switch model.phase {
-        case .transcribing:
-            WaitingMeter()
-        case .recording:
-            VoiceMeter(level: model.level, speaking: true, asleep: false)
-        default:
-            VoiceMeter(level: 0, speaking: false, asleep: false)
+    /// The sound side.
+    @ViewBuilder private var leading: some View {
+        HStack(spacing: 7) {
+            if costVisible {
+                Text(model.cost)
+                    .font(.system(size: 11, weight: .regular, design: .rounded).monospacedDigit())
+                    .foregroundStyle(Color.white.opacity(0.4))
+                    .contentTransition(.numericText())
+                    .lineLimit(1)
+                    .fixedSize()
+                    .frame(width: Self.costWidth, alignment: .leading)
+                    .transition(.opacity.combined(with: .move(edge: .trailing)))
+            }
+            if model.phase == .recording {
+                Waveform(samples: model.samples, color: Palette.red)
+                    .frame(width: Self.slotWidth, height: geometry.waveHeight)
+                    .transition(.opacity.combined(with: .scale(scale: 0.7, anchor: .leading)))
+            } else {
+                Color.clear.frame(width: 14)
+            }
         }
+        .padding(.leading, geometry.contentInset)
     }
-}
 
-/// iOS system colors, dark variants.
-enum Palette {
-    static let red = Color(red: 1, green: 0.271, blue: 0.227)
-    static let green = Color(red: 0.196, green: 0.843, blue: 0.294)
-    static let orange = Color(red: 1, green: 0.624, blue: 0.039)
-}
-
-/// Left: the state at a glance.
-struct StatusGlyph: View {
-    let phase: DictationModel.Phase
-
-    var body: some View {
-        ZStack {
-            switch phase {
-            case .hidden, .recording:
-                RecordingDot().transition(.scale(scale: 0.3).combined(with: .opacity))
+    /// The state side.
+    @ViewBuilder private var trailing: some View {
+        ZStack(alignment: .trailing) {
+            switch model.phase {
+            case .recording:
+                ElapsedLabel(seconds: model.elapsed)
+                    .transition(.opacity.combined(with: .scale(scale: 0.7)))
             case .transcribing:
-                Spinner().transition(.scale(scale: 0.3).combined(with: .opacity))
+                Spinner().transition(.opacity.combined(with: .scale(scale: 0.5)))
             case .done:
                 Image(systemName: "checkmark")
-                    .font(.system(size: 9, weight: .heavy))
+                    .font(.system(size: 10, weight: .heavy))
                     .foregroundStyle(Palette.green)
-                    .transition(.scale(scale: 0.3).combined(with: .opacity))
+                    .transition(.opacity.combined(with: .scale(scale: 0.5)))
             case .failed:
                 Image(systemName: "exclamationmark")
-                    .font(.system(size: 9.5, weight: .heavy))
+                    .font(.system(size: 10.5, weight: .heavy))
                     .foregroundStyle(Palette.orange)
-                    .transition(.scale(scale: 0.3).combined(with: .opacity))
+                    .transition(.opacity.combined(with: .scale(scale: 0.5)))
+            case .hidden:
+                Color.clear
             }
         }
-        .frame(width: 10, height: 10)
+        .padding(.trailing, geometry.contentInset)
     }
+
 }
 
-/// The red recording light, breathing slowly like the one iOS shows while recording.
-struct RecordingDot: View {
-    @State private var breathing = false
+/// One click and two clicks, told apart properly.
+///
+/// SwiftUI fires a single tap even when a second one is on its way, and here a single click stops the
+/// recording — so a double click would end the dictation before it ever showed the cost. AppKit can
+/// make the single wait for the double to fail, which is exactly what is needed.
+struct ClickCatcher: NSViewRepresentable {
+    var onClick: () -> Void
+    var onDoubleClick: () -> Void
 
-    var body: some View {
-        Circle()
-            .fill(Palette.red)
-            .frame(width: 8, height: 8)
-            .shadow(color: Palette.red.opacity(breathing ? 0.85 : 0.35), radius: breathing ? 4 : 1.5)
-            .opacity(breathing ? 1 : 0.72)
-            .animation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true), value: breathing)
-            .onAppear { breathing = true }
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        let double = NSClickGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.double(_:)))
+        double.numberOfClicksRequired = 2
+        let single = NSClickGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.single(_:)))
+        single.numberOfClicksRequired = 1
+        single.delaysPrimaryMouseButtonEvents = false
+        view.addGestureRecognizer(double)
+        view.addGestureRecognizer(single)
+        return view
     }
-}
 
-/// A thin ring that spins while the transcription comes back.
-struct Spinner: View {
-    var body: some View {
-        TimelineView(.animation) { timeline in
-            let turns = timeline.date.timeIntervalSinceReferenceDate / 0.85
-            Circle()
-                .trim(from: 0.18, to: 1)
-                .stroke(Color.white.opacity(0.88), style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
-                .rotationEffect(.degrees(turns.truncatingRemainder(dividingBy: 1) * 360))
-                .frame(width: 8.5, height: 8.5)
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.onClick = onClick
+        context.coordinator.onDoubleClick = onDoubleClick
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(onClick: onClick, onDoubleClick: onDoubleClick) }
+
+    final class Coordinator: NSObject {
+        var onClick: () -> Void
+        var onDoubleClick: () -> Void
+        private var pending: DispatchWorkItem?
+
+        init(onClick: @escaping () -> Void, onDoubleClick: @escaping () -> Void) {
+            self.onClick = onClick
+            self.onDoubleClick = onDoubleClick
         }
-    }
-}
 
-/// Right, while transcribing: the five bars ripple quietly instead of following the microphone.
-struct WaitingMeter: View {
-    var body: some View {
-        TimelineView(.animation) { timeline in
-            let t = timeline.date.timeIntervalSinceReferenceDate
-            Canvas { context, size in
-                let count = VoiceMeter.profile.count
-                let barWidth = size.width / CGFloat(count)
-                let inset = barWidth * 0.34
-                for index in 0..<count {
-                    let wave = 0.5 + 0.5 * sin(t * 2 * .pi * 1.1 - Double(index) * 0.8)
-                    let fraction = VoiceMeter.floorFraction + 0.32 * CGFloat(wave)
-                    let height = max(2, fraction * size.height)
-                    let rect = CGRect(x: CGFloat(index) * barWidth + inset / 2, y: (size.height - height) / 2,
-                                      width: max(1, barWidth - inset), height: height)
-                    context.fill(Path(roundedRect: rect, cornerRadius: rect.width / 2),
-                                 with: .color(Color.white.opacity(0.55)))
-                }
-            }
+        @objc func single(_ sender: NSClickGestureRecognizer) {
+            pending?.cancel()
+            let work = DispatchWorkItem { [weak self] in self?.onClick() }
+            pending = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + NSEvent.doubleClickInterval, execute: work)
+        }
+
+        @objc func double(_ sender: NSClickGestureRecognizer) {
+            pending?.cancel()
+            pending = nil
+            onDoubleClick()
         }
     }
 }

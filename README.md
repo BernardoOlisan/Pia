@@ -60,7 +60,7 @@ For local development, from a clone: `claude --plugin-dir /path/to/Pia`.
 | `/pia:init` | Set up PIA in a repo: `.pia/`, import `docs/RULES.md` as 📌 Binding decisions, point `CLAUDE.md` at PIA, enable auto-compaction (600k tokens) and agent teams. Restart Claude Code afterwards. |
 | `/pia:new <intention>` | Start a work. Keeps the machine awake, clarifies the intention, runs the team. |
 | `/pia:new --voice` | Same, but you say the intention and answer the questions by talking (macOS, notch, GPT-Live). See [voice/](voice/IDEAS.md). |
-| `/pia:transcribe` or **⌥Space** | Just dictation, no PIA: the notch records until you click it (or press ⌥Space again), `gpt-transcribe` writes it, and the text is copied to your clipboard. Never reaches Claude. |
+| `/pia:transcribe` or **⌥Space** | Just dictation, no PIA: the island records until you click it (or press ⌥Space again), `gpt-transcribe` writes it, and the text is copied to your clipboard. Never reaches Claude. |
 | `/pia:status` | Where every work stands. |
 | `/pia:continue [work]` | Resume a work after reviewing its decisions, or in a new session. |
 | `/pia:change D-017 <answer>` | Change a decision and see its impact. |
@@ -68,9 +68,16 @@ For local development, from a clone: `claude --plugin-dir /path/to/Pia`.
 | `/pia:out-of-the-loop [work]` | Don't stop; go all the way to implementation. `--default` on either changes the project default. |
 | `/pia:compact <tokens>` | Change the auto-compaction window, e.g. `600k`. |
 
+### The island
+
+While you dictate, the island in the notch draws what Voice Memos draws: the live waveform on one side, the elapsed time on the other, both in red. On a screen with no notch — an external monitor — it floats as a full pill instead, and it follows you across screens and across Desktops.
+
+- **One click** stops the take. So does ⌥Space.
+- **Two clicks** show this month's cost beside the waveform, as a quiet white hint; two more hide it again. It is hidden by default.
+
 ### Dictation cost
 
-The notch shows what dictation has cost this month (`gpt-transcribe`, $0.0045 per minute). It starts again at `$0.000` every month. To reset it sooner, stop the dictation process and delete its ledger:
+Dictation costs $0.0045 per minute (`gpt-transcribe`). The total starts again at `$0.000` every month. To reset it sooner, stop the dictation process and delete its ledger:
 
 ```
 pkill -f "pia-voice dictate serve"; rm -f ~/Library/Application\ Support/PIA\ Voice/dictation.json

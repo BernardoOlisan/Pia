@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import PiaVoiceCore
+import PiaVoiceNotch
 
 @main
 enum PiaVoiceMain {
@@ -9,6 +10,7 @@ enum PiaVoiceMain {
            pia-voice dictate toggle|ensure|stop
            pia-voice dictate serve [--record] [--hotkey <keys>|off] [--stay]
            pia-voice transcribe <audio file>
+           pia-voice notch demo [--voice] [--capsule|--notch] [--cycle]
 
     intent: talk through a PIA intent with GPT-Live. Prints PIA-VOICE lines for the Lead on stdout.
 
@@ -31,6 +33,14 @@ enum PiaVoiceMain {
         --stay               keep running when no Claude Code is open
 
     transcribe: transcribe one audio file with gpt-transcribe and print the text (for testing).
+
+    notch demo: the island with a fake voice — no microphone, no API key, nothing billed. For judging
+    the shape, the motion and whether it follows you across Spaces and screens.
+
+      --voice                the GPT-Live intent island instead of the dictation one
+      --capsule / --notch    force the other screen's shape (an external monitor has no notch)
+      --cycle                walk through the states on its own
+      --quiet                no diagnostics on stderr
     """
 
     static func main() {
@@ -40,6 +50,7 @@ enum PiaVoiceMain {
         case "intent": runIntent(args)
         case "dictate": runDictate(args)
         case "transcribe": runTranscribe(args)
+        case "notch": runNotch(args)
         case "--help", "-h": print(usage); exit(0)
         default: fail(usage)
         }
@@ -160,6 +171,35 @@ enum PiaVoiceMain {
         }
         done.wait()
         exit(status)
+    }
+
+    // MARK: notch demo
+
+    static func runNotch(_ arguments: [String]) {
+        var args = arguments
+        guard !args.isEmpty, args.removeFirst() == "demo" else { fail(usage) }
+        var options = NotchDemoOptions()
+        while !args.isEmpty {
+            switch args.removeFirst() {
+            case "--voice": options.island = "voice"
+            case "--dictation": options.island = "dictation"
+            case "--capsule": options.forcedStyle = .capsule
+            case "--notch": options.forcedStyle = .notch
+            case "--cycle": options.cycle = true
+            case "--quiet": options.quiet = true
+            case let flag: fail("unknown option \(flag)\n\(usage)")
+            }
+        }
+        setvbuf(stdout, nil, _IOLBF, 0)
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        MainActor.assumeIsolated {
+            let demo = NotchDemo(options: options)
+            onSignals([SIGTERM, SIGINT, SIGHUP]) { exit(0) }
+            DispatchQueue.main.async { MainActor.assumeIsolated { demo.start() } }
+            retained = demo
+        }
+        app.run()
     }
 
     // MARK: Signals

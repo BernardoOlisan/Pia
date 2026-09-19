@@ -176,7 +176,8 @@ final class IntentSession {
         let speaking = voiceLevel > Self.soundLevel
         if speaking { lastActivity = Date(); lastVoiceAudio = Date() }
         notch.voiceSpeaking = speaking
-        notch.level = max(audio.inputLevel, voiceLevel)
+        notch.push(level: max(audio.inputLevel, voiceLevel))
+        notch.elapsed = cost.seconds
         notch.cost = cost.label
         transcript.flushPaused()
 
