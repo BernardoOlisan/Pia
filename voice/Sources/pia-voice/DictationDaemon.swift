@@ -56,7 +56,12 @@ enum DictationDaemon {
         if let record = running() {
             let modified = (try? FileManager.default.attributesOfItem(atPath: executable)[.modificationDate] as? Date)?
                 .timeIntervalSince1970 ?? 0
-            guard record.executable != executable || modified > record.started else { return 0 }
+            guard record.executable != executable || modified > record.started else {
+                // Nothing to replace — but orphans never clean themselves up, and this hook is the only
+                // thing that runs on every session start, so it is where they get noticed.
+                sweepOthers(keeping: record.pid)
+                return 0
+            }
             kill(record.pid, SIGTERM)
             for _ in 0..<20 where running() != nil { usleep(100_000) }
             if running() != nil { return 0 }
@@ -66,7 +71,45 @@ enum DictationDaemon {
 
     static func stop() -> Int32 {
         if let record = running() { kill(record.pid, SIGTERM) }
+        sweepOthers()
         return 0
+    }
+
+    /// Every other `pia-voice dictate serve` on this Mac, whatever path it was launched from.
+    ///
+    /// The PID file knows about exactly one. A daemon whose entry gets overwritten — an older build
+    /// that outlived its SIGTERM, a copy started from a different plugin version or from the repo —
+    /// becomes invisible to every check here while it still holds the microphone and still writes
+    /// recording.m4a. Two of them interleave takes and hand OpenAI a corrupt file, and the global
+    /// shortcut only ever reaches whichever one won the registration, so the island starts a take
+    /// that the shortcut can no longer stop.
+    static func otherServers() -> [pid_t] {
+        let pgrep = Process()
+        pgrep.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+        pgrep.arguments = ["-f", "pia-voice dictate serve"]
+        let pipe = Pipe()
+        pgrep.standardOutput = pipe
+        pgrep.standardError = FileHandle.nullDevice
+        guard (try? pgrep.run()) != nil else { return [] }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        pgrep.waitUntilExit()
+        let mine = getpid()
+        return String(decoding: data, as: UTF8.self)
+            .split(whereSeparator: \.isNewline)
+            .compactMap { pid_t($0.trimmingCharacters(in: .whitespaces)) }
+            .filter { $0 != mine && $0 > 1 }
+    }
+
+    /// Leave exactly one daemon alive. A dictation in progress in the others finishes first.
+    ///
+    /// `keeping` is the one that is allowed to survive, for callers that are not themselves the daemon:
+    /// `ensure` runs in a throwaway process, so without it the sweep would kill the very daemon it just
+    /// decided to keep.
+    @discardableResult
+    static func sweepOthers(keeping keep: pid_t? = nil) -> Int {
+        let others = otherServers().filter { $0 != keep }
+        for pid in others { kill(pid, SIGTERM) }
+        return others.count
     }
 
     /// A detached `pia-voice dictate serve`, in its own session so it outlives the hook that started it.

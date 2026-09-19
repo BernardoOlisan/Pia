@@ -58,6 +58,9 @@ final class DictationSession {
 
     func start() {
         try? FileManager.default.createDirectory(at: DictationPaths.dir, withIntermediateDirectories: true)
+        // One daemon per Mac, enforced by looking at the process table rather than trusting the PID file.
+        let swept = DictationDaemon.sweepOthers()
+        if swept > 0 { log("stopped \(swept) other dictation process\(swept == 1 ? "" : "es")") }
         DictationDaemon.writeRecord()
         window = NotchWindow(dictation: model)
         window.diagnostics = { [weak self] line in self?.log("island · " + line) }
