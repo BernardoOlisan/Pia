@@ -60,7 +60,7 @@ For local development, from a clone: `claude --plugin-dir /path/to/Pia`.
 | Command | What it does |
 |---|---|
 | `/pia:init` | Set up PIA in a repo: `.pia/`, import `docs/RULES.md` as 📌 Binding decisions, move `CLAUDE.md` to `AGENTS.md` and point it at PIA, enable auto-compaction (600k tokens) and agent teams. Restart Claude Code afterwards. |
-| `/pia:new <what you want>` | Start a work. Keeps the machine awake, talks it through with you while a scout investigates, runs the team. |
+| `/pia:new <what you want>` | Start a work. Keeps the machine awake, talks it through with you while a scout investigates, runs the team. Add `--out-of-the-loop` to skip the talk and let it decide everything. |
 | `/pia:new --voice` | Same, but the talk happens out loud (macOS, notch, GPT-Live). See [voice/](voice/IDEAS.md). |
 | `/pia:transcribe` or **⌥Space** | Just dictation, no PIA: the island records until you click it (or press ⌥Space again), `gpt-transcribe` writes it, and the text is copied to your clipboard. Never reaches Claude. |
 | `/pia:transcribe follow` or **⌥⇧Space** | The same, but this take is **added** to the last one. The clipboard carries everything said since the last fresh take, one blank line between takes. |
@@ -68,7 +68,7 @@ For local development, from a clone: `claude --plugin-dir /path/to/Pia`.
 | `/pia:continue [work]` | Resume a work after reviewing its decisions, or in a new session. |
 | `/pia:change D-017 <answer>` | Change a decision and see its impact. |
 | `/pia:in-the-loop [work]` | Stop at the decision map and wait for you (default). |
-| `/pia:out-of-the-loop [work]` | Don't stop; go all the way to implementation. `--default` on either changes the project default. |
+| `/pia:out-of-the-loop [work]` | Don't stop; go all the way to implementation — including mid-talk, where the questions you haven't answered become decisions. `--default` on either changes the project default. |
 | `/pia:compact <tokens>` | Change the auto-compaction window, e.g. `600k`. |
 
 ### The island

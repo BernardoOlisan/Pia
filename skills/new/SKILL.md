@@ -1,7 +1,7 @@
 ---
 name: new
 description: Start a new PIA work from an intention. Keeps the machine awake, then talks it through with you while a scout investigates in parallel, turns it into a decision map, and builds it.
-argument-hint: "<your intention> | --voice"
+argument-hint: "<your intention> [--voice] [--out-of-the-loop]"
 disable-model-invocation: true
 allowed-tools: Read, Write, Edit, Glob, Grep, Monitor, Bash(ls *), Bash(mkdir -p *), Bash(date *), Bash(git rev-parse *), Bash(swift build *), Bash("${CLAUDE_PLUGIN_ROOT}/voice/.build/release/pia-voice" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/awake.sh" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/next-decision-id.sh" *)
 ---
@@ -33,7 +33,7 @@ If the human gave no intention, say one line — "Va, cuéntame" in their langua
    bash "${CLAUDE_PLUGIN_ROOT}/scripts/awake.sh" start .pia/work/<id>
    ```
    The PID is saved in `.pia/work/<id>/caffeinate.pid`. That file is how every agent knows which process to kill later.
-4. Write `state.json` from `${CLAUDE_PLUGIN_ROOT}/templates/work/state.json`: `id`, `title`, `mode` = the `mode` in `config.json`, `phase` = `talk`, `lead_session` = `${CLAUDE_SESSION_ID}`, `created` and `updated` = now.
+4. Write `state.json` from `${CLAUDE_PLUGIN_ROOT}/templates/work/state.json`: `id`, `title`, `mode` = `out-of-the-loop` if the arguments contain `--out-of-the-loop` (`--in-the-loop` likewise), else the `mode` in `config.json`; `phase` = `talk`, `lead_session` = `${CLAUDE_SESSION_ID}`, `created` and `updated` = now.
 5. Copy `${CLAUDE_PLUGIN_ROOT}/templates/work/log.md` and `talk.md` into the work folder, fill the id and whatever the human already said, and log "work created" with the script.
 
 ## 2. Spawn the scout immediately (before your first question)
@@ -44,7 +44,11 @@ The human never talks to the scout. You do, in one line at a time.
 
 ## 3. The talk (PIA.md → Phase 1, and *Writing for the human*)
 
-One conversation that is the intention and the research at once. Follow Phase 1 exactly. In short:
+One conversation that is the intention and the research at once. Follow Phase 1 exactly.
+
+**Check `mode` in `state.json` before every question you would put to the human**, not once at the end. If it is `out-of-the-loop`, ask them nothing: turn every question you would have asked — including any you already asked and they never answered — into a decision of your own, marked `Asked you during the talk; you were away.`, close the talk yourself, and go to step 4 (PIA.md → Phase 1 → *When the human isn't there*). If they switch mid-talk, that takes effect on the spot.
+
+In short, while they are in the loop:
 
 - **One or two questions at a time**, in the human's language, like a colleague. No numbered rounds.
 - **Ask only what the scout can't find out.** Send the scout what to look at as the talk moves; ask it direct questions and take two-or-three-line answers. **Never read `research.md`** — that is how your context stays small.
@@ -56,7 +60,7 @@ Write `talk.md` as you go, from `${CLAUDE_PLUGIN_ROOT}/templates/work/talk.md`. 
 
 ### With `--voice`: the talk happens out loud
 
-If the arguments contain `--voice`, the human talks and you answer through the notch (PIA.md → Phase 1 → *By voice*). Nothing else changes: you still think the questions and you are the only writer of `talk.md`.
+If the arguments contain `--voice`, the human talks and you answer through the notch (PIA.md → Phase 1 → *By voice*). With `--out-of-the-loop` there is nobody to talk to, so say that in one line and skip the voice. Nothing else changes: you still think the questions and you are the only writer of `talk.md`.
 
 1. **Binary.** If `${CLAUDE_PLUGIN_ROOT}/voice/.build/release/pia-voice` doesn't exist, tell the human it's being built once (a few minutes), and run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/voice-bin.sh" build`. If it fails, tell the human and continue the talk in the terminal.
 2. **Start it** right after creating the work, with the Monitor tool (persistent, so every line reaches you as an event):
@@ -104,7 +108,7 @@ Read `mode` from `state.json` **now**:
   1. set phase `awaiting-review`;
   2. **stop caffeinate:** `bash "${CLAUDE_PLUGIN_ROOT}/scripts/awake.sh" stop .pia/work/<id>`;
   3. shut down the scout and the scout reviewer;
-  4. tell the human, short: counts by weight (and how many they decided in the talk), the titles of the 🔴 decisions, the path `.pia/work/<id>/decisions.md`, and that they can change any decision (by saying so or with `/pia:change`) and continue with `/pia:continue`. Then stop.
+  4. tell the human, short: first the titles of any cards that say *you were away*, then counts by weight (and how many they decided in the talk), the titles of the 🔴 decisions, the path `.pia/work/<id>/decisions.md`, and that they can change any decision (by saying so or with `/pia:change`) and continue with `/pia:continue`. Then stop.
 - **`out-of-the-loop`** → shut down the scout and the scout reviewer, and go to step 6.
 
 ## 6. Before implementing

@@ -16,7 +16,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls *), Bash(mkdir -p *), Bash
 
 | Phase | What to do |
 |---|---|
-| `talk` | Carry on the conversation with the human. Start caffeinate if it isn't running, and spawn a fresh `scout-<NNN>` if the old one is gone — it resumes from `research.md` and its own log. |
+| `talk` | Check `mode` first. `in-the-loop` → carry on the conversation from where it stopped. `out-of-the-loop` → don't ask anything: close the talk yourself (PIA.md → Phase 1 → *When the human isn't there*) and go to `decisions`. Either way, start caffeinate if it isn't running, and spawn a fresh `scout-<NNN>` if the old one is gone — it resumes from `research.md` and its own log. |
 | `decisions` | If `## Now` says it is waiting for another work to finish implementing, check again (PIA.md → *Works in parallel*): still blocked → tell the human and stop; free → **start caffeinate** and move to implement. Otherwise it was interrupted: **start caffeinate** and spawn a fresh scout and scout reviewer, telling them to resume from the files, `## Now` in `log.md`, and the log of the agent they replace. |
 | `implement` | Work was interrupted. **Start caffeinate** (`bash "${CLAUDE_PLUGIN_ROOT}/scripts/awake.sh" start .pia/work/<id>`; it does nothing if already running). Spawn a fresh implementer; it resumes from the `## Steps` checklist in the previous implementer's log. |
 | `awaiting-review` | The human has reviewed the map. Mark every card still `Status: agent` as `approved` (in `decisions.md` and `DECISIONS.md`). **Start caffeinate**, check *Works in parallel*, set phase `implement` and spawn the implementer. |

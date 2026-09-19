@@ -15,4 +15,7 @@ allowed-tools: Read, Edit, Glob, Bash(ls *), Bash(date *), Bash(bash "${CLAUDE_P
 
 Set `"mode": "in-the-loop"` and `updated` in its `state.json`, and log the switch with `bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh" .pia/work/<id>/log.md "mode → in-the-loop" --doing "<what the lead is doing>" --phase <phase>`.
 
-Reply in one line. If the work is already past the decision map (phase `implement`, `test` or `done`), say that this mode only matters at the decision map, so this work won't stop now.
+Reply in one line.
+
+- If its phase is `talk`, the human is back: carry on asking them questions from where the conversation stopped, and say so.
+- If the work is already past the decision map (phase `implement`, `test` or `done`), say that this mode only matters during the talk and at the decision map, so this work won't stop now.

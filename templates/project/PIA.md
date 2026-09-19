@@ -48,7 +48,9 @@ talk → decisions → [stop here if mode = in-the-loop] → implement → test 
 - **`in-the-loop`** (default): the human stays in the loop. Stop when the decision map is finished and wait for the human.
 - **`out-of-the-loop`**: keep going through implementation without stopping (e.g. overnight). The human reviews the decisions afterwards.
 
-The project default lives in `.pia/config.json`; each work has its own `mode` in `state.json`. The human switches it at any time (`/pia:in-the-loop`, `/pia:out-of-the-loop`, or just saying so). **The lead reads `mode` from `state.json` at the moment the decision map is finished, not before**, so switching during the talk works.
+The project default lives in `.pia/config.json`; each work has its own `mode` in `state.json`. The human switches it at any time (`/pia:in-the-loop`, `/pia:out-of-the-loop`, or just saying so), including in the middle of the talk, and `/pia:new` takes `--out-of-the-loop` to start that way.
+
+**The lead checks `mode` before every question it would put to the human**, not once at the end. The talk is where the human is needed most, so the talk is where a switch has to take effect; a lead that only reads the mode later keeps asking an empty chair.
 
 ## Keep-awake (caffeinate)
 
@@ -126,6 +128,14 @@ One conversation that is the intention **and** the research at the same time. No
 
 **How the talk ends.** When the lead could explain the work back without guessing anything, it does exactly that: a short summary of what it understood — the intention, the scope, what matters most — and asks the human to confirm. Not more questions about details: a demonstration of understanding. If the human corrects it, or thinks of something new right after it, the talk simply carries on. **The talk is never closed**: test feedback lands in it too (Phase 4).
 
+### When the human isn't there (mode `out-of-the-loop`)
+
+*"What happens when the boss isn't there? The agents decide."*
+
+- **From the start:** ask the human nothing at all. Talk to the scout instead, and make every question you would have asked into a decision of your own. A mode that sometimes stops is not a mode: never wait, and never ask whether they are still there.
+- **Switched mid-talk** (the usual case: *"I'm going to sleep"*): stop asking at once. Take the questions they left unanswered **and the ones you were still going to ask**, and turn each into a decision with its answer and its reason. Then end the talk yourself: write into `talk.md` the summary you would have demonstrated, saying plainly that they did not confirm it. Set phase `decisions` and carry on.
+- **A question they never answered outranks an ordinary decision**, because you judged it worth their time. Its card carries the line `Asked you during the talk; you were away.`, and every report you send them afterwards lists those cards **first**, ahead of the 🔴 ones. Otherwise the one thing they cared about is buried among twenty others.
+
 **Write `talk.md` as the talk goes**, not at the end, using the `talk.md` template. Then set phase `decisions`.
 
 **By voice** (optional, `/pia:new --voice` in Claude Code on macOS): the human says the intention and answers by talking, through `pia-voice` in the notch. The rules above don't change: the lead still thinks the questions and is the only writer of `talk.md`. `pia-voice` prints lines for the lead (`PIA-VOICE INTENT`, `ANSWERS R<n>`, `CONFIRMED`, `ENDED`). The voice protocol is still round-based, so on the voice path only, the lead writes its questions under `## The conversation` as `### Round N` blocks with numbered questions and suggested answers, and adds `<!-- pia-voice: ready to confirm -->` at the top when the talk is ready to confirm. The conversation is kept in `logs/voice.md`.
@@ -145,7 +155,7 @@ Then write `decisions.md`, which is **for the human**. Follow the `decisions.md`
 
 1. **List every decision the work needs** (architecture, where things run, data, behaviour, libraries, failure cases, trade-offs) and every assumption you would otherwise make silently. *Everything written must be a decision.*
 2. **Learn how the human thinks first.** Read the lines of `DECISIONS.md` for the areas this work touches (and past works' `decisions.md` when relevant). Recommend consistently with past choices and say so: *"Consistent with D-004."*
-3. **Always decide.** The recommended option is the decision. Say why in one or two sentences. Decisions the human already made in the talk keep the human's answer, with `Status: human`.
+3. **Always decide.** The recommended option is the decision. Say why in one or two sentences. Decisions the human already made in the talk keep the human's answer, with `Status: human`. A card that replaced a question the human never got to answer says so on its own line: `Asked you during the talk; you were away.`
 4. **IDs are global and permanent.** Reserve them with the decision ID script (`next-decision-id.sh <project root> <work id> <count>`): it takes a lock, so two works never get the same number, and appends `⏳ reserved` lines to `DECISIONS.md`. Replace each reserved line with the real one when its card is written. Without the script: take the next number after the highest `D-NNN` in `.pia/` and append its line right away. Never reuse or renumber.
 5. **Area:** give every decision a short lowercase area (`reports`, `auth`, `sync`…). Reuse existing areas from `DECISIONS.md` before inventing one.
 6. **Weight** every decision:
@@ -158,7 +168,7 @@ Then write `decisions.md`, which is **for the human**. Follow the `decisions.md`
 10. When approved: make sure every decision has its final line in `DECISIONS.md` (`D-NNN  weight  [area] what was decided · work/<id> · status`, no `⏳` left), then tell the lead `DECISIONS DONE`.
 
 **Lead, when decisions are done:** read `mode` from `state.json` now.
-- `in-the-loop` → set phase `awaiting-review`, **stop caffeinate**, shut down the scout and its reviewer, and send the human a short message: counts by weight, the titles of the 🔴 decisions, the path to `decisions.md`, and how to continue (change any decision by saying so or with `/pia:change`, then `/pia:continue`). Then stop.
+- `in-the-loop` → set phase `awaiting-review`, **stop caffeinate**, shut down the scout and its reviewer, and send the human a short message: first the titles of any cards that say *you were away*, then counts by weight, the titles of the 🔴 decisions, the path to `decisions.md`, and how to continue (change any decision by saying so or with `/pia:change`, then `/pia:continue`). Then stop.
 - `out-of-the-loop` → set phase `implement`, shut down the scout and its reviewer, and go to Phase 3.
 
 ## Reviewing (scout reviewer)
@@ -190,7 +200,7 @@ The implementer plans its own work. There is no plan document to follow.
 5. **After each step**, send the lead `STEP DONE <n> of <total>: <one line>`. The lead logs it, so its `## Now` shows real progress.
 6. When everything is done, tell the lead `IMPLEMENTATION DONE` with: what was built (3 to 5 bullets), how to test it (short numbered steps), and what you could not verify yourself.
 
-**Lead:** set phase `test`, **stop caffeinate**, shut down the implementer, and send the human that summary, short.
+**Lead:** set phase `test`, **stop caffeinate**, shut down the implementer, and send the human that summary, short. If the work ran `out-of-the-loop`, open with the cards that say *you were away*: those are the questions you would have put to them.
 
 ## Phase 4: Test (human ⇄ lead ⇄ implementer)
 
