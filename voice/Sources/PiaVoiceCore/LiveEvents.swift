@@ -8,7 +8,7 @@ public enum LiveEvents {
 
     public struct Config {
         public var model = "gpt-live-1"
-        public var voice = "marin"
+        public var voice = "sol"
         public var instructions: String
         public var backendModel = "gpt-5.6-terra"
         public var backendInstructions: String

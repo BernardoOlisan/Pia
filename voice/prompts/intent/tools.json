@@ -14,21 +14,8 @@
   },
   {
     "type": "function",
-    "name": "set_mode",
-    "description": "Change how you behave when Claude has something to say while the island is asleep. Call this when the person asks for it, e.g. 'just let me know, don't talk to me' or 'you can talk to me again'.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "mode": { "type": "string", "enum": ["speak", "notify"], "description": "speak: wake up and say it. notify: stay quiet, the island lights up instead." }
-      },
-      "required": ["mode"],
-      "additionalProperties": false
-    }
-  },
-  {
-    "type": "function",
     "name": "end_voice",
-    "description": "End the voice. Call it when the person says they don't want to talk any more, or that they are leaving. Claude carries on in the terminal.",
+    "description": "End the voice. Call it as soon as the person says they don't want to talk any more, that they will carry on in the terminal, or that they are leaving. Call it in the same turn you say goodbye, never later. Claude carries on in the terminal.",
     "parameters": {
       "type": "object",
       "properties": {

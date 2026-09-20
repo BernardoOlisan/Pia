@@ -10,11 +10,9 @@ struct Options {
     /// Test mode: speech files played in turn, each after the voice finishes talking.
     var inputFiles: [URL] = []
     var showNotch = true
-    var voice = "marin"
+    var voice = "sol"
     /// Seconds without anyone speaking before the session closes (silence is billed).
     var idleSeconds: Double = 20
-    /// What happens when Claude has something while the island is asleep.
-    var mode = VoiceBridge.Mode.speak
     /// Wakes the island, or puts it back to sleep, without reaching for the mouse.
     var hotkey: HotkeySpec? = HotkeySpec.parse("option+v")
     /// The model that carries sentences to Claude. Tools only exist under delegation, so it has to be there.
@@ -43,7 +41,7 @@ final class IntentSession {
     private var apiKey = ""
     private var bridge: VoiceBridge!
     private var hotkey: GlobalHotkey?
-    /// What Claude said while the island was asleep, waiting for you to wake it.
+    /// What Claude said that the voice could not deliver, held until it can.
     private var waiting: [String] = []
     private let audio = AudioIO()
     private let vad = VoiceActivity()
@@ -65,6 +63,12 @@ final class IntentSession {
     private var outgoing: [Int16] = []
     private var lastActivity = Date()
     private var lastVoiceAudio = Date.distantPast
+    /// When the open session started, so the clock ticks every frame instead of waiting for the server.
+    private var sessionOpenedAt = Date()
+    /// Loudness of the audio GPT-Live sent us, before it reaches the speakers. The speaker level moves
+    /// with the Mac's volume; this doesn't, so the island breathes the same however loud you have it.
+    private var voiceEnvelope: Float = 0
+    private var gapsAtSessionStart = 0
     private var finishing = false
     /// True once a session has opened at least once, so the first message always speaks whatever the mode.
     private var everOpened = false
@@ -95,7 +99,7 @@ final class IntentSession {
         if !FileManager.default.fileExists(atPath: inboxURL.path) {
             FileManager.default.createFile(atPath: inboxURL.path, contents: Data())
         }
-        bridge = VoiceBridge(inbox: inboxURL, mode: options.mode) { [emitter] line in emitter.line(line) }
+        bridge = VoiceBridge(inbox: inboxURL) { [emitter] line in emitter.line(line) }
         let workID = options.workDir.lastPathComponent
         if let data = try? Data(contentsOf: options.workDir.appendingPathComponent("state.json")),
            let stateJSON = (try? JSONSerialization.jsonObject(with: data)) as? JSONObject {
@@ -135,15 +139,17 @@ final class IntentSession {
         }
         inboxPoller = FilePoller(url: inboxURL)
         inboxPoller.start { [weak self] in self?.inboxChanged() }
-        Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+        Timer.scheduledTimer(withTimeInterval: 1.0 / 20, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
 
         voiceLog.note("voice started (echo cancellation: \(audio.echoCancellation ? "on" : "off"))")
         emitter.line("PIA-VOICE READY " + JSON.encode([
-            "work": workID, "echo_cancellation": audio.echoCancellation, "mode": options.mode.rawValue,
-            "inbox": inboxURL.path,
+            "work": workID, "echo_cancellation": audio.echoCancellation, "inbox": inboxURL.path,
         ]))
+        // Say hello straight away. Claude still has to read the code, and a person would say so out
+        // loud rather than leave you looking at a silent island for a minute.
+        greet()
         inboxChanged()
     }
 
@@ -202,13 +208,18 @@ final class IntentSession {
     }
 
     private func tick() {
-        let voiceLevel = audio.outputLevel
-        // GPT-Live streams audio all the time, silence included: only real sound counts as activity.
-        let speaking = voiceLevel > Self.soundLevel
-        if speaking { lastActivity = Date(); lastVoiceAudio = Date() }
+        // The voice's own loudness, decayed: the island breathes with what GPT-Live sent, not with how
+        // loud your speakers happen to be.
+        voiceEnvelope *= 0.82
+        let speaking = state == .live && Date().timeIntervalSince(lastVoiceAudio) < 0.35 && voiceEnvelope > 0.02
+        if speaking { lastActivity = Date() }
         notch.voiceSpeaking = speaking
-        notch.push(level: max(audio.inputLevel, voiceLevel))
-        notch.elapsed = cost.seconds
+        notch.level = speaking ? min(1, voiceEnvelope * 2.2) : 0
+        // The waveform is your microphone and nothing else.
+        notch.push(level: audio.inputLevel)
+        // The clock runs locally between the server's cumulative reports, so it ticks instead of jumping.
+        let openFor = state == .live ? Date().timeIntervalSince(sessionOpenedAt) : 0
+        notch.elapsed = cost.closedSeconds + max(cost.sessionSeconds, openFor)
         notch.cost = cost.label
         transcript.flushPaused()
 
@@ -227,6 +238,7 @@ final class IntentSession {
     private func open(sendPreroll: Bool, notices: [JSONObject]) {
         state = .connecting
         reachedLive = false
+        gapsAtSessionStart = audio.playbackGaps
         sendPrerollOnStart = sendPreroll
         pendingOnStart = notices
         lastActivity = Date()
@@ -285,6 +297,7 @@ final class IntentSession {
             state = .live
             reachedLive = true
             everOpened = true
+            sessionOpenedAt = Date()
             undelivered = []
             notch.connected = true
             lastActivity = Date()
@@ -295,6 +308,8 @@ final class IntentSession {
 
         case "session.output_audio.delta":
             if let b64 = event["delta"] as? String, let data = Data(base64Encoded: b64) {
+                voiceEnvelope = max(voiceEnvelope, Self.loudness(of: data))
+                lastVoiceAudio = Date()
                 audio.play(pcm16: data)
             }
 
@@ -326,7 +341,9 @@ final class IntentSession {
         case "session.closed":
             let seconds = ((event["usage"] as? JSONObject)?["seconds"] as? NSNumber)?.doubleValue
             cost.closeSession(finalSeconds: seconds)
-            voiceLog.note("session closed (\(event["reason"] as? String ?? "?")) · \(cost.label) · backend tokens in \(cost.backendInputTokens) out \(cost.backendOutputTokens)")
+            let gaps = audio.playbackGaps - gapsAtSessionStart
+            voiceLog.note("session closed (\(event["reason"] as? String ?? "?")) · \(cost.breakdown)"
+                          + (gaps > 0 ? " · \(gaps) audible gap\(gaps == 1 ? "" : "s") in playback" : ""))
             live?.disconnect()
 
         case "error":
@@ -343,7 +360,6 @@ final class IntentSession {
 
     private func runTool(_ call: LiveEvents.FunctionCall) {
         let output = bridge.handle(name: call.name, arguments: call.arguments)
-        if call.name == "set_mode" { notch.notifyOnly = bridge.mode == .notify }
         voiceLog.note("tool \(call.name) \(call.arguments) → \(output)")
         live?.send(LiveEvents.functionOutput(callID: call.callID, output: output))
         live?.send(LiveEvents.responseCreate())
@@ -367,57 +383,94 @@ final class IntentSession {
         let messages = bridge.newMessages()
         guard !messages.isEmpty else { return }
         for message in messages { voiceLog.note("from claude: \(message)") }
-
-        // The very first message always speaks: you just asked for a voice, so it answering is not a
-        // surprise. After that the mode decides.
-        let speakNow = !everOpened || bridge.mode == .speak
-        guard speakNow else {
-            waiting.append(contentsOf: messages)
-            if !notch.waiting { chime() }
-            notch.waiting = true
-            voiceLog.note("holding \(waiting.count) message(s): notify mode")
-            return
-        }
-        deliver(messages)
+        deliver(waiting + messages)
     }
 
     /// Says messages now, opening a session if there isn't one.
+    ///
+    /// Each message becomes its own append. A live session refuses anything over 500 tokens, and the
+    /// one time they were glued together the whole of a deep research answer was rejected and never
+    /// heard. Long ones are split on sentence boundaries rather than dropped.
     private func deliver(_ messages: [String]) {
-        let text = messages.joined(separator: "\n")
+        guard !messages.isEmpty else { return }
         notch.waiting = false
         waiting.removeAll()
         undelivered = messages
+
+        let opening = state == .idle || state == .closing
+        let key = opening ? "from_claude_reopen" : "from_claude"
+        let events = Self.chunked(messages).map { piece in
+            opening ? LiveEvents.instructions(prompts.notice(key, text: piece))
+                    : LiveEvents.thinking(prompts.notice(key, text: piece))
+        }
+        deliverNotices(events, opening: opening)
+    }
+
+    private func deliverNotices(_ events: [JSONObject], opening: Bool) {
         switch state {
         case .live:
-            live?.send(LiveEvents.thinking(prompts.notice("from_claude", text: text)))
+            for event in events { live?.send(event) }
             live?.send(LiveEvents.responseCreate())
         case .connecting:
-            pendingOnStart.append(LiveEvents.thinking(prompts.notice("from_claude", text: text)))
+            pendingOnStart.append(contentsOf: events)
         case .idle, .closing:
             if state == .closing { live?.disconnect() }
-            open(sendPreroll: false, notices: [LiveEvents.instructions(prompts.notice("from_claude_reopen", text: text))])
+            open(sendPreroll: false, notices: events)
+        }
+        _ = opening
+    }
+
+    /// Roughly 500 tokens, measured as characters because that is all we can measure here and it errs
+    /// on the safe side for Spanish. Split at sentence ends so a piece never stops mid-word.
+    static let appendCharacterLimit = 1400
+
+    static func chunked(_ messages: [String]) -> [String] {
+        var pieces: [String] = []
+        for message in messages {
+            let text = message.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { continue }
+            if text.count <= appendCharacterLimit { pieces.append(text); continue }
+            var current = ""
+            for sentence in text.split(separator: " ", omittingEmptySubsequences: false) {
+                let candidate = current.isEmpty ? String(sentence) : current + " " + sentence
+                if candidate.count > appendCharacterLimit, !current.isEmpty {
+                    pieces.append(current)
+                    current = String(sentence)
+                } else {
+                    current = candidate
+                }
+            }
+            if !current.isEmpty { pieces.append(current) }
+        }
+        return pieces
+    }
+
+    /// 0...1 loudness of a block of 16-bit PCM, straight from GPT-Live.
+    static func loudness(of data: Data) -> Float {
+        guard data.count >= 2 else { return 0 }
+        return data.withUnsafeBytes { raw -> Float in
+            let samples = raw.bindMemory(to: Int16.self)
+            guard !samples.isEmpty else { return 0 }
+            var sum: Double = 0
+            let step = max(1, samples.count / 512)
+            var counted = 0
+            var i = 0
+            while i < samples.count {
+                let value = Double(samples[i]) / 32768
+                sum += value * value
+                counted += 1
+                i += step
+            }
+            guard counted > 0 else { return 0 }
+            return Float(min(1, (sum / Double(counted)).squareRoot() * 3))
         }
     }
 
-    // MARK: Awake and asleep
-
-    /// One click on the island, or the shortcut. Asleep → wake and deliver anything Claude is holding.
-    /// Awake → sleep, and stop the meter.
-    private func toggleAwake() {
-        guard !finishing else { return }
-        switch state {
-        case .live, .connecting:
-            voiceLog.note("asleep by hand · \(cost.label)")
-            closeSession()
-        case .idle, .closing:
-            if !waiting.isEmpty {
-                deliver(waiting)
-            } else {
-                notch.waiting = false
-                if state == .closing { live?.disconnect() }
-                open(sendPreroll: false, notices: [LiveEvents.instructions(prompts.notice("woken"))])
-            }
-        }
+    /// The first thing that happens: a hello while Claude reads the code. A person would say "give me
+    /// a second" out loud rather than leave you staring at a silent island.
+    private func greet() {
+        let intro = workTitle.isEmpty ? "(todavía no dijo el título del trabajo)" : workTitle
+        deliverNotices([LiveEvents.instructions(prompts.notice("greeting", text: intro))], opening: true)
     }
 
     /// Tell the Lead the voice is broken. It used to go to stderr only, so Claude kept writing lines
@@ -431,20 +484,25 @@ final class IntentSession {
         ]))
     }
 
-    /// One soft note, once, when Claude has something and the island stays quiet. Synthesised rather
-    /// than a system sound, so it never reads as a notification.
-    private func chime() {
-        let rate = Double(LiveEvents.sampleRate)
-        let seconds = 0.16
-        let samples = Int(rate * seconds)
-        var pcm = [Int16](repeating: 0, count: samples)
-        for i in 0..<samples {
-            let t = Double(i) / rate
-            let envelope = exp(-t * 26) * (t < 0.006 ? t / 0.006 : 1)   // fast in, soft out: no click
-            let tone = sin(2 * .pi * 880 * t) + 0.4 * sin(2 * .pi * 1320 * t)
-            pcm[i] = Int16(max(-1, min(1, tone / 1.4)) * envelope * 5200)
+    // MARK: Awake and asleep
+
+    /// One click on the island, or the shortcut. Asleep → wake and deliver anything held back.
+    /// Awake → sleep, and stop the meter.
+    private func toggleAwake() {
+        guard !finishing else { return }
+        switch state {
+        case .live, .connecting:
+            voiceLog.note("asleep by hand · \(cost.breakdown)")
+            closeSession()
+        case .idle, .closing:
+            if !waiting.isEmpty {
+                deliver(waiting)
+            } else {
+                notch.waiting = false
+                if state == .closing { live?.disconnect() }
+                open(sendPreroll: false, notices: [LiveEvents.instructions(prompts.notice("woken"))])
+            }
         }
-        audio.play(pcm16: pcm.withUnsafeBufferPointer { Data(buffer: $0) })
     }
 
     // MARK: Prompts with context

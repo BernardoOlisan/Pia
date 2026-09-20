@@ -15,15 +15,13 @@ enum PiaVoiceMain {
     intent: the talk, out loud. Claude is the brain; this is his voice. Prints PIA-VOICE lines for him
     on stdout, and says back whatever he appends to logs/voice-inbox.txt in the work folder.
 
-      --notify               when Claude has something and the island is asleep, light the island and
-                             chime instead of speaking. Nothing is billed until you wake it.
       --hotkey <keys>        shortcut that wakes the island or puts it to sleep (default option+v), or off
       --backend-model <m>    the model that carries sentences to Claude (default: gpt-5.6-terra)
       --prompts <dir>        prompts folder (default: voice/prompts/intent next to the build)
       --input-file <audio>   test mode: speech from audio files instead of the microphone; repeat it
                              for several turns, each played after the voice stops talking
       --no-notch             don't show the notch
-      --voice <name>         GPT-Live voice (default: marin)
+      --voice <name>         GPT-Live voice (default: sol)
       --idle <seconds>       close the session after this much silence (default: 20)
 
     dictate: record, transcribe with gpt-transcribe, copy the text to the clipboard.
@@ -88,7 +86,6 @@ enum PiaVoiceMain {
             case "--no-notch": options.showNotch = false
             case "--voice": options.voice = value()
             case "--backend-model": options.backendModel = value()
-            case "--notify": options.mode = .notify
             case "--hotkey":
                 let text = value()
                 if text.lowercased() == "off" { options.hotkey = nil }

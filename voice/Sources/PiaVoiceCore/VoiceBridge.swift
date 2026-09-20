@@ -10,29 +10,15 @@ import Foundation
 /// numbered rounds and a poll asking whether the next round was ready. That is why it sounded like a
 /// form being filled in. Claude is the brain now; the voice is its mouth, and this is the air between.
 public final class VoiceBridge {
-    /// What happens when Claude has something to say and the island is asleep.
-    public enum Mode: String, Sendable, CaseIterable {
-        /// Wake up and say it. The default: you asked for a voice.
-        case speak
-        /// Stay asleep. Light the island and chime once; nothing is billed until you wake it.
-        case notify
-
-        public static func parse(_ text: String) -> Mode? {
-            Mode(rawValue: text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
-        }
-    }
-
     public let inbox: URL
-    public private(set) var mode: Mode
     public private(set) var ended = false
     public private(set) var endReason = ""
     /// Lines already handed to the voice, so a poll only ever returns what is new.
     private var consumed = 0
     private let emit: (String) -> Void
 
-    public init(inbox: URL, mode: Mode = .speak, emit: @escaping (String) -> Void) {
+    public init(inbox: URL, emit: @escaping (String) -> Void) {
         self.inbox = inbox
-        self.mode = mode
         self.emit = emit
     }
 
@@ -64,17 +50,6 @@ public final class VoiceBridge {
             else { return result(["ok": false, "error": "text is required"]) }
             emit("PIA-VOICE SAID " + JSON.encode(["text": text]))
             return result(["ok": true, "note": "Claude has it. Keep talking; his answer will reach you when he has one."])
-
-        case "set_mode":
-            guard let raw = args["mode"] as? String, let parsed = Mode.parse(raw) else {
-                return result(["ok": false, "error": "mode must be speak or notify"])
-            }
-            mode = parsed
-            emit("PIA-VOICE MODE " + JSON.encode(["mode": parsed.rawValue]))
-            return result(["ok": true, "mode": parsed.rawValue,
-                           "note": parsed == .notify
-                               ? "From now on the island lights up instead of speaking. Say so in one short sentence."
-                               : "From now on you speak up when Claude has something. Say so in one short sentence."])
 
         case "end_voice":
             ended = true

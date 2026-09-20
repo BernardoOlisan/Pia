@@ -15,6 +15,8 @@ public final class AudioIO {
     public var inputLevel: Float { levelLock.withLock { _inputLevel } }
     public var outputLevel: Float { levelLock.withLock { _outputLevel } }
     public var isPlaying: Bool { ring.count > 0 }
+    /// How many audible gaps the player has hit. A rising number while the voice talks is the choppiness.
+    public var playbackGaps: Int { ring.underruns }
 
     private let engine = AVAudioEngine()
     private var ring = FloatRing(capacity: 48_000 * 120)

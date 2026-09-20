@@ -6,6 +6,9 @@ final class FloatRing {
     private var readIndex = 0
     private var writeIndex = 0
     private(set) var count = 0
+    /// Times the player asked for audio and the buffer had some, but not enough. Each one is a gap
+    /// you can hear: the voice cutting out mid-word. Silence (nothing at all) is not counted.
+    private(set) var underruns = 0
     private let lock = NSLock()
 
     init(capacity: Int) { storage = [Float](repeating: 0, count: max(1, capacity)) }
@@ -30,7 +33,10 @@ final class FloatRing {
             readIndex = (readIndex + 1) % cap
         }
         count -= n
-        if n < frames { for i in n..<frames { out[i] = 0 } }
+        if n < frames {
+            for i in n..<frames { out[i] = 0 }
+            if n > 0 { underruns += 1 }
+        }
         return n
     }
 

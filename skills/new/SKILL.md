@@ -3,7 +3,7 @@ name: new
 description: Start a new PIA work from an intention. Keeps the machine awake, then talks it through with you while a scout investigates in parallel, turns it into a decision map, and builds it.
 argument-hint: "<your intention> [--voice] [--out-of-the-loop]"
 disable-model-invocation: true
-allowed-tools: Read, Write, Edit, Glob, Grep, Monitor, Bash(ls *), Bash(mkdir -p *), Bash(date *), Bash(git rev-parse *), Bash(swift build *), Bash("${CLAUDE_PLUGIN_ROOT}/voice/.build/release/pia-voice" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/awake.sh" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/next-decision-id.sh" *)
+allowed-tools: Read, Write, Edit, Glob, Grep, Monitor, Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/voice-say.sh" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/voice-bin.sh" *), Bash(ls *), Bash(mkdir -p *), Bash(date *), Bash(git rev-parse *), Bash(swift build *), Bash("${CLAUDE_PLUGIN_ROOT}/voice/.build/release/pia-voice" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/awake.sh" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/next-decision-id.sh" *)
 ---
 
 # /pia:new (you are the PIA lead)
@@ -60,21 +60,24 @@ Write `talk.md` as you go, from `${CLAUDE_PLUGIN_ROOT}/templates/work/talk.md`. 
 
 ### With `--voice`: the talk happens out loud
 
-If the arguments contain `--voice`, the human talks and you answer through the notch (PIA.md → Phase 1 → *By voice*). Nothing else changes: you are still the brain and the only writer of `talk.md`. With `--out-of-the-loop` there is nobody to talk to, so say that in one line and skip the voice.
+If the arguments contain `--voice`, the human talks and you answer through the notch (PIA.md → Phase 1 → *By voice*). You are still the brain and the only writer of `talk.md`. With `--out-of-the-loop` there is nobody to talk to, so say that in one line and skip the voice.
 
 1. **Binary.** If `${CLAUDE_PLUGIN_ROOT}/voice/.build/release/pia-voice` doesn't exist, tell the human it's being built once (a few minutes), and run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/voice-bin.sh" build`. If it fails, tell the human and carry on in the terminal.
-2. **Start it** right after creating the work, with the Monitor tool (persistent, so every line reaches you as an event). Add `--notify` if they asked for the island to signal instead of speak:
+2. **Start it first**, before anything else you would do for the work, with the Monitor tool (persistent, so every line reaches you as an event):
    ```bash
    "${CLAUDE_PLUGIN_ROOT}/voice/.build/release/pia-voice" intent .pia/work/<id>
    ```
-3. **Say the first thing.** `PIA-VOICE READY` carries the path of the inbox. Append your opening line to it — answering what they already typed after `--voice`, or asking them to tell you if they typed nothing. **Don't make them repeat what they already wrote.** That first line always opens the session and speaks, whatever the mode.
-4. **Talk by appending.** One line per message to `logs/voice-inbox.txt`, whenever you have something. Written to be heard: no lists, no paths, no decision IDs. Never write anything else into that file.
-5. **React to its lines**, logging each one (`FROM VOICE: …`):
-   - `PIA-VOICE SAID {"text": …}`: what the human said. Treat it exactly as if they had typed it — record decisions under *Decided by you*, ask the scout, and answer through the inbox.
-   - `PIA-VOICE MODE {"mode": …}`: they switched between speaking and signalling. Nothing to do but log it.
-   - `PIA-VOICE ENDED {"reason": …}`: **the voice stopped, not the human.** Unless the reason clearly says they are leaving, stay `in-the-loop` and carry on in the terminal, writing normally again. If it does say they are leaving, follow PIA.md → Phase 1 → *When the human isn't there*.
-   - `PIA-VOICE ERROR {"message": …}`: the voice is broken, not finished. **Stop appending to the inbox** — nothing written there will be heard. Tell the human in one line, in plain words, and carry on in the terminal.
-6. If the human types in the terminal while the voice runs, that is an answer too. To stop the voice, stop the Monitor task: `pia-voice` prints `PIA-VOICE ENDED` and exits.
+   It greets the human by itself and tells them you're catching up, so they are not left in silence while you read the code.
+3. **Talk with the say script**, never by writing to the inbox file:
+   ```bash
+   bash "${CLAUDE_PLUGIN_ROOT}/scripts/voice-say.sh" .pia/work/<id> "what you want to say"
+   ```
+   Your normal writing voice; the voice turns it into speech. **One idea per message**, and don't repeat in the terminal what you just said out loud — put the exact names, versions, prices and links there instead.
+4. **React to its lines**, logging each one (`FROM VOICE: …`):
+   - `PIA-VOICE SAID {"text": …}`: what the human said. Treat it exactly as if they had typed it — record decisions under *Decided by you*, ask the scout, answer with the say script. **If it means they are done talking, stop the Monitor task yourself** and carry on in the terminal.
+   - `PIA-VOICE ENDED {"reason": …}`: the voice stopped, not the human. Unless the reason clearly says they are leaving, stay `in-the-loop` and carry on in the terminal, writing normally again. If it does say they are leaving, follow PIA.md → Phase 1 → *When the human isn't there*.
+   - `PIA-VOICE ERROR {"message": …}`: the voice is broken. **Stop saying things** — nothing will be heard. Tell the human in one line, in plain words, and carry on in the terminal.
+5. If the human types in the terminal while the voice runs, that is an answer too.
 
 ## 4. Lead the team (PIA.md → Team, Phases 2 to 4)
 

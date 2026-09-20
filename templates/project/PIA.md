@@ -138,14 +138,21 @@ One conversation that is the intention **and** the research at the same time. No
 
 **Write `talk.md` as the talk goes**, not at the end, using the `talk.md` template. Then set phase `decisions`.
 
-**By voice** (optional, `/pia:new --voice` in Claude Code on macOS): the same talk, out loud. You are still the brain — you read the code, ask the scout and decide what to say. Everything in front of you is mouth and ears: a live voice, and a small model whose only job is to pass sentences to you.
+**By voice** (optional, `/pia:new --voice` in Claude Code on macOS): the same talk, out loud. You are still the brain — you read the code, ask the scout and decide what to say. In front of you are a live voice and a small model whose only job is to pass sentences to you.
 
-- **How it works.** The voice passes on what the human said as a `PIA-VOICE SAID` line. You answer by appending **one line at a time** to `logs/voice-inbox.txt` in the work folder, and the voice says it in its own words. No rounds and no forms: write when you have something, exactly as you would type it.
-- **Write to be heard.** Everything you append is going to be spoken, so *Writing for the human* holds, plus three rules that only matter out loud: no lists or headings, because a bullet can't be heard; never a file path, a decision ID or a code name; and as long as the idea needs, but in pieces, so the human can interrupt.
-- **The island is the switch.** A session bills by the second, silence included, so it closes itself after a stretch of quiet and **speaking never reopens it**. One click on the island, or ⌥V, wakes it or puts it to sleep; two clicks show the cost, as in dictation.
-- **When you have something and the island is asleep**, the voice wakes and says it. Started with `--notify`, the island's dot turns blue and chimes once instead, and nothing is billed until the human wakes it. They can switch either way by saying so.
-- **`PIA-VOICE ENDED` means the voice stopped, not that the human left.** Unless they clearly said they are going away, the work stays `in-the-loop`: carry on in the terminal, writing normally. Out-of-the-loop is never inferred (see *When the human isn't there*).
-- The conversation is kept in `logs/voice.md`. You write `talk.md` exactly as in the typed talk.
+**Everything in this section applies only while the voice is running.** The typed talk does not change in any way.
+
+- **How it works.** The voice passes on what the human said as a `PIA-VOICE SAID` line. You answer with the say script, which appends to the voice's inbox for you:
+  `bash "<plugin>/scripts/voice-say.sh" .pia/work/<id> "what you want to say"`
+  Never write to `logs/voice-inbox.txt` by hand: a live session rejects any single append over 500 tokens and drops the whole thing, and the script is what splits a long answer so that can't happen.
+- **Write like you write to them.** Your normal voice, not a script. The voice decides how to say it, and it is better placed to: it knows whether they just interrupted you, whether they already heard half of it, whether they asked about one thing only. You don't. Don't flatten your writing into baby talk and don't try to pre-format it for speech.
+- **One idea per message.** Say one thing and stop. If there is a list, give the headline and let them ask for the rest — sending five messages in a row turns into a two-minute monologue they can't interrupt. This rule exists because it is spoken; it does not apply to the typed talk.
+- **The terminal complements, it doesn't echo.** Never write "I just told you out loud that…". They heard it. Use the terminal for what speech can't carry: exact names, versions, prices, links, paths. They hear the idea and read the specifics.
+- **The island is the switch.** A session bills by the second, silence included, so it closes itself after a stretch of quiet and **speaking never reopens it**. One click on the island, or ⌥V, wakes it or puts it to sleep; two clicks show what this talk has cost, voice and backend together.
+- **Ending is yours to do, not the voice's.** When a `PIA-VOICE SAID` line means they are done talking — "I don't want to talk any more", "I'll carry on typing" — **stop the voice yourself** by stopping the Monitor task, and carry on in the terminal writing normally. Don't wait for the voice to end itself; it has forgotten to before, and then it sits there costing money.
+- **`PIA-VOICE ENDED` means the voice stopped, not that the human left.** Unless they clearly said they are going away, the work stays `in-the-loop`. Out-of-the-loop is never inferred (see *When the human isn't there*).
+- **`PIA-VOICE ERROR` means the voice is broken, not finished.** Stop saying things — nothing will be heard. Tell the human in one line and carry on in the terminal.
+- The conversation is kept in `logs/voice.md`, with the cost of each session broken down. You write `talk.md` exactly as in the typed talk.
 
 ## Phase 2: Research and decisions (scout ⇄ scout-reviewer)
 

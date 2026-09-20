@@ -60,19 +60,30 @@ Two directions, no protocol:
 
 - **Out:** `tell_claude(text)` — free text, the person's own words — and `pia-voice` prints
   `PIA-VOICE SAID {…}`, which reaches the lead as an event.
-- **In:** the lead appends **one line at a time** to `logs/voice-inbox.txt` in the work folder. Each
-  line is something to say. The voice says it in its own words.
+- **In:** the lead runs `scripts/voice-say.sh <work> "…"`, which appends to `logs/voice-inbox.txt`.
+  A poller picks it up and pushes it into the live session, and the voice says it in its own words.
 
-There are no rounds and no forms. The lead writes when it has something, exactly as it would type.
+The inbound half has to be a file rather than a tool call, because Claude answers on its own clock —
+it might be thirty seconds deep in the code. A tool call is synchronous: the session would freeze and
+the voice would go silent waiting for it. (That is exactly what the old `check_questions` poll was,
+and why it sounded like a form.) The script exists so the lead never touches the file directly: a
+live session **rejects any single append over 500 tokens** and drops the whole thing, so the script
+splits long answers at sentence ends.
 
-### Writing to be heard
+### Who writes for whom
 
-Everything the lead appends is going to be **spoken**. The rules in `PIA.md` → *Writing for the human*
-still hold, plus three that only matter out loud:
+Claude writes **like Claude**, in its normal voice. It does not pre-format for speech, and it should
+not: the voice is the one that knows whether you just interrupted, whether you already heard half the
+list, whether you asked about one thing only. Claude can't see any of that.
 
-- No lists, no headings. You can't hear a bullet.
-- Never a file path, a decision ID or a code name.
-- As long as the idea needs — but in pieces, so you can interrupt.
+So the voice owns *how* it is said — and one thing it may not touch: **names, numbers, prices and
+versions are spoken exactly as given.** Everything else is its to phrase.
+
+Two rules on Claude's side, and both exist only because it is spoken:
+
+- **One idea per message.** A list becomes a headline plus an offer, not five messages in a row.
+- **The terminal complements, it never echoes.** You hear "Syncfusion is free under a million a year";
+  the terminal shows the name spelled out and the link.
 
 ### The island is the switch
 
@@ -80,30 +91,25 @@ A live session bills **by the second, silence included**. So:
 
 - It **closes itself** after about 20 seconds of quiet.
 - **Speaking never reopens it.** A cough near the microphone can't start billing.
-- **One click**, or ⌥V, wakes it or puts it back to sleep. **Two clicks** show the cost.
-- The dot is the state: white while a session is open, **blue** while Claude is holding something for
-  you, a quiet breathing ring when it is asleep with nothing to say.
+- **One click**, or ⌥V, wakes it or puts it back to sleep. **Two clicks** show what this talk has cost.
+- The dot is the state: white while a session is open, **blue** while something could not be delivered
+  and is being held, a quiet breathing ring when it is asleep.
+- The waveform is **your microphone only**, and the island's breathing comes from the audio GPT-Live
+  sent, before it reaches the speakers — so how loud you have your Mac changes nothing.
 
 While asleep the microphone stays open **locally** — that is what makes waking instant and lets the
 chime play — but nothing leaves this Mac and nothing is billed.
 
 ### When Claude has something and the island is asleep
 
-| Mode | What happens |
-|---|---|
-| `speak` (default) | The session reopens and the voice says it. |
-| `notify` (`--notify`) | The dot turns blue and a short soft note plays, once. Nothing is billed until you wake it. |
+The session reopens and the voice says it. There is no quiet mode: it was built, it never chimed, and
+a setting nobody uses is a setting that hides bugs.
 
-The first message always speaks, whatever the mode: you just asked for a voice. You can switch either
-way mid-conversation by saying so ("just let me know, don't talk to me").
+### Starting
 
-### When it breaks
-
-A session that never opens is broken, not finished. `pia-voice` says so to the lead as
-`PIA-VOICE ERROR`, holds whatever the voice was about to say, and turns the dot blue so a click
-retries it. It does **not** reopen on a timer. That line is the whole point: the first time this went
-wrong the error only reached stderr, so Claude kept writing into an inbox nobody could read while the
-island sat at 0:00.
+`pia-voice` opens a session and says hello **immediately**, before Claude has read anything, and tells
+you it is catching up. A person would; leaving you in front of a silent island for a minute is what it
+did before.
 
 ### Ending
 
@@ -118,7 +124,7 @@ Three ways out: say it ("ya no quiero hablar"), tell Claude to stop it, or `pkil
 ## Commands
 
 ```
-pia-voice intent <work dir> [--notify] [--hotkey <keys>|off] [--voice <name>] [--idle <s>] [--no-notch]
+pia-voice intent <work dir> [--hotkey <keys>|off] [--voice <name>] [--backend-model <m>] [--idle <s>]
 pia-voice dictate toggle [--append] | ensure | stop
 pia-voice dictate serve [--record [--append]] [--hotkey <keys>|off] [--stay]
 pia-voice transcribe <audio file>
@@ -135,7 +141,8 @@ voice/
 ├── Package.swift
 ├── prompts/intent/
 │   ├── voice.md        the GPT-Live prompt, in Spanish (the language it speaks)
-│   ├── tools.json      tell_claude, set_mode, end_voice
+│   ├── backend.md      the model that carries sentences to Claude
+│   ├── tools.json      tell_claude, end_voice
 │   └── notices.md      what pia-voice pushes into a live session
 └── Sources/
     ├── PiaVoiceCore/   the WebSocket protocol, the bridge, transcription, cost, keychain
@@ -161,6 +168,8 @@ Prompts live in files, not in code, so they can be changed without touching Swif
 - A function call arrives as `response.output_item.done` (`call_id`, `name`, `arguments`); the client
   answers with `response.item.create` carrying a `function_call_output`, then `response.create`.
 - **`gpt-transcribe`** costs $0.0045/min.
+- Each mid-session context append is capped at **500 tokens**. Going over doesn't truncate — the whole
+  append is rejected and the voice says nothing at all.
 
 ## Not built yet
 

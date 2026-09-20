@@ -109,3 +109,57 @@ final class AppendHotkeyTests: XCTestCase {
         XCTAssertEqual(append?.modifiers, 4096 | 256 | 512)
     }
 }
+
+/// The say script is what stands between a long answer and a session that silently rejects it.
+final class VoiceSayScriptTests: XCTestCase {
+    func run(_ work: URL, _ text: String) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = [
+            URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+                .deletingLastPathComponent().appendingPathComponent("scripts/voice-say.sh").path,
+            work.path, text,
+        ]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        XCTAssertEqual(process.terminationStatus, 0)
+    }
+
+    func testEveryLineStaysUnderTheAppendLimit() throws {
+        let work = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: work.appendingPathComponent("logs"), withIntermediateDirectories: true)
+        let inbox = work.appendingPathComponent("logs/voice-inbox.txt")
+        FileManager.default.createFile(atPath: inbox.path, contents: Data())
+
+        try run(work, "Una frase corta.")
+        try run(work, Array(repeating: "Esta es una oracion larga de prueba.", count: 120).joined(separator: " "))
+
+        let lines = try String(contentsOf: inbox, encoding: .utf8)
+            .split(whereSeparator: \.isNewline).map(String.init)
+        XCTAssertGreaterThan(lines.count, 2, "the long one must have been split")
+        for line in lines {
+            XCTAssertLessThanOrEqual(line.count, 1400, "a single append over the limit is dropped whole")
+        }
+        XCTAssertEqual(lines.first, "Una frase corta.")
+    }
+
+    func testRefusesAWorkWithNoVoiceRunning() throws {
+        let work = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = [
+            URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+                .deletingLastPathComponent().appendingPathComponent("scripts/voice-say.sh").path,
+            work.path, "hola",
+        ]
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        XCTAssertNotEqual(process.terminationStatus, 0)
+    }
+}

@@ -11,8 +11,8 @@ final class VoiceBridgeTests: XCTestCase {
         lines = []
     }
 
-    func bridge(mode: VoiceBridge.Mode = .speak) -> VoiceBridge {
-        VoiceBridge(inbox: dir.appendingPathComponent("voice-inbox.txt"), mode: mode) { self.lines.append($0) }
+    func bridge() -> VoiceBridge {
+        VoiceBridge(inbox: dir.appendingPathComponent("voice-inbox.txt")) { self.lines.append($0) }
     }
 
     func write(_ text: String) throws {
@@ -56,18 +56,6 @@ final class VoiceBridgeTests: XCTestCase {
         XCTAssertTrue(lines.isEmpty)
     }
 
-    func testModeSwitchesBothWays() {
-        let b = bridge()
-        XCTAssertEqual(b.mode, .speak)
-        XCTAssertEqual(JSON.decode(b.handle(name: "set_mode", arguments: #"{"mode":"notify"}"#))?["ok"] as? Bool, true)
-        XCTAssertEqual(b.mode, .notify)
-        XCTAssertEqual(lines.last, #"PIA-VOICE MODE {"mode":"notify"}"#)
-        _ = b.handle(name: "set_mode", arguments: #"{"mode":"speak"}"#)
-        XCTAssertEqual(b.mode, .speak)
-        XCTAssertEqual(JSON.decode(b.handle(name: "set_mode", arguments: #"{"mode":"loud"}"#))?["ok"] as? Bool, false)
-        XCTAssertEqual(b.mode, .speak)
-    }
-
     func testEndVoiceKeepsTheReason() {
         let b = bridge()
         XCTAssertFalse(b.ended)
@@ -79,6 +67,7 @@ final class VoiceBridgeTests: XCTestCase {
 
     func testUnknownToolIsRefused() {
         XCTAssertEqual(JSON.decode(bridge().handle(name: "send_intent", arguments: "{}"))?["ok"] as? Bool, false)
+        XCTAssertEqual(JSON.decode(bridge().handle(name: "set_mode", arguments: #"{"mode":"notify"}"#))?["ok"] as? Bool, false)
     }
 }
 
@@ -89,7 +78,7 @@ final class LiveEventsTests: XCTestCase {
     func testToolsLiveUnderDelegationAndNotOnTheSession() {
         var config = LiveEvents.Config(instructions: "voz", backendInstructions: "backend",
                                        tools: [["type": "function", "name": "tell_claude"]])
-        config.voice = "marin"
+        config.voice = "sol"
         let event = LiveEvents.sessionStart(config, history: [LiveEvents.historyItem(role: "user", text: "hola")])
         XCTAssertEqual(event["type"] as? String, "session.start")
         let session = event["session"] as! JSONObject
@@ -160,11 +149,25 @@ final class TranscriptAndCostTests: XCTestCase {
         var cost = CostMeter()
         cost.update(sessionSeconds: 30)
         cost.update(sessionSeconds: 60)
-        XCTAssertEqual(cost.label, "$0.05")
+        XCTAssertEqual(cost.voiceDollars, 0.05, accuracy: 0.0001)
         cost.closeSession(finalSeconds: 66)
         cost.update(sessionSeconds: 54)
         XCTAssertEqual(cost.seconds, 120)
-        XCTAssertEqual(cost.label, "$0.10")
+        XCTAssertEqual(cost.voiceDollars, 0.10, accuracy: 0.0001)
+    }
+
+    /// The backend is billed separately and is not small: the one real talk burned 360,965 input
+    /// tokens while the island proudly showed $0.45. A number that leaves half the bill out is worse
+    /// than no number.
+    func testTheBackendIsPartOfThePrice() {
+        var cost = CostMeter()
+        cost.update(sessionSeconds: 540)
+        XCTAssertEqual(cost.voiceDollars, 0.45, accuracy: 0.0001)
+        cost.addBackend(inputTokens: 360_965, outputTokens: 2_568)
+        XCTAssertGreaterThan(cost.backendDollars, 0)
+        XCTAssertEqual(cost.dollars, cost.voiceDollars + cost.backendDollars, accuracy: 0.0001)
+        XCTAssertTrue(cost.breakdown.contains("360965 in"), cost.breakdown)
+        XCTAssertTrue(cost.breakdown.contains("backend"), cost.breakdown)
     }
 
     func testNotices() {
