@@ -17,10 +17,11 @@ const mates = atom({ plugin: 'pia', key: 'mates' } as const, [] as Mate[])
 const collapsed = atom({ plugin: 'pia', key: 'collapsed' } as const, false)
 const spanish = atom({ plugin: 'pia', key: 'spanish' } as const, false)
 
-// The README's owl, drawn by hand at 8×8 so the band stays four rows tall: ears, amber eyes with their
-// pupils, the beak, the light belly, the wing line and the feet. Two pixels per terminal cell: ▀ paints
-// the top one in the foreground and the bottom one behind it; ▄ when only the bottom one is there; a
-// space when neither. The outline is lighter than the README's so it reads on a dark terminal.
+// The README's owl, drawn by hand at 8×8: ears, amber eyes with their pupils, the beak, the light belly,
+// the wing line and the feet. Painted with cell backgrounds only, two cells per pixel so each one is
+// square: Apple Terminal draws block characters like ▀ from the font, a hair short of the cell, and
+// every row of them showed a seam. The outline is lighter than the README's so it reads on a dark
+// terminal.
 const OWL = [
   'DD....DD',
   'DBBBBBBD',
@@ -35,8 +36,6 @@ const PALETTE: Record<string, number> = {
   D: 0x6b6fd6, B: 0x3d3f9e, E: 0xffd166, P: 0x1a1b3a, K: 0xff8c42, L: 0x8d92f0, W: 0x2c2e78,
 }
 const DEFAULT = 0x01000000
-const UPPER_HALF = 0x2580
-const LOWER_HALF = 0x2584
 const SPACE = 0x20
 
 function base64(bytes: Uint8Array): string {
@@ -51,29 +50,18 @@ function base64(bytes: Uint8Array): string {
   return out
 }
 
-const OWL_COLUMNS = 8
-const OWL_ROWS = 4
+const OWL_COLUMNS = 16
+const OWL_ROWS = 8
 
 function owlCells(): string {
   const words = new Uint32Array(OWL_COLUMNS * OWL_ROWS * 3)
   let k = 0
-  for (let row = 0; row < OWL_ROWS * 2; row += 2) {
+  for (let row = 0; row < OWL_ROWS; row++) {
     for (let col = 0; col < OWL_COLUMNS; col++) {
-      const top = PALETTE[OWL[row]?.charAt(col) ?? '.']
-      const bottom = PALETTE[OWL[row + 1]?.charAt(col) ?? '.']
-      if (top !== undefined) {
-        words[k++] = UPPER_HALF
-        words[k++] = top
-        words[k++] = bottom ?? DEFAULT
-      } else if (bottom !== undefined) {
-        words[k++] = LOWER_HALF
-        words[k++] = bottom
-        words[k++] = DEFAULT
-      } else {
-        words[k++] = SPACE
-        words[k++] = DEFAULT
-        words[k++] = DEFAULT
-      }
+      const color = PALETTE[OWL[row]?.charAt(Math.floor(col / 2)) ?? '.']
+      words[k++] = SPACE
+      words[k++] = DEFAULT
+      words[k++] = color ?? DEFAULT
     }
   }
   return base64(new Uint8Array(words.buffer))
