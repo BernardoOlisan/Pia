@@ -63,7 +63,6 @@ For local development, from a clone: `claude --plugin-dir /path/to/Pia`.
 |---|---|
 | `/pia:init` | Set up PIA in a repo: `.pia/`, import `docs/RULES.md` as 📌 Binding decisions, move `CLAUDE.md` to `AGENTS.md` and point it at PIA, enable auto-compaction (600k tokens) and agent teams. Restart Claude Code afterwards. |
 | `/pia:new <what you want>` | Start a work. Keeps the machine awake, talks it through with you while a scout investigates, runs the team. Add `--out-of-the-loop` to skip the talk and let it decide everything. |
-| `/pia:new --voice` | Same, but the talk happens out loud (macOS, notch, GPT-Live). See [voice/](voice/IDEAS.md). |
 | `/pia:transcribe` or **⌥Space** | Just dictation, no PIA: the island records until you click it (or press ⌥Space again), `gpt-transcribe` writes it, and the text is copied to your clipboard. Never reaches Claude. |
 | `/pia:transcribe follow` or **⌥⇧Space** | The same, but this take is **added** to the last one. The clipboard carries everything said since the last fresh take, one blank line between takes. |
 | `/pia:status` | Where every work stands. |

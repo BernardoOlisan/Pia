@@ -6,23 +6,10 @@ import PiaVoiceNotch
 @main
 enum PiaVoiceMain {
     static let usage = """
-    usage: pia-voice intent <work dir> [options]
-           pia-voice dictate toggle [--append] | ensure | stop
+    usage: pia-voice dictate toggle [--append] | ensure | stop
            pia-voice dictate serve [--record [--append]] [--hotkey <keys>|off] [--stay]
            pia-voice transcribe <audio file>
-           pia-voice notch demo [--voice] [--capsule|--notch] [--cycle] [--append]
-
-    intent: the talk, out loud. Claude is the brain; this is his voice. Prints PIA-VOICE lines for him
-    on stdout, and says back whatever he appends to logs/voice-inbox.txt in the work folder.
-
-      --hotkey <keys>        shortcut that wakes the island or puts it to sleep (default option+v), or off
-      --backend-model <m>    the model that carries sentences to Claude (default: gpt-5.6-terra)
-      --prompts <dir>        prompts folder (default: voice/prompts/intent next to the build)
-      --input-file <audio>   test mode: speech from audio files instead of the microphone; repeat it
-                             for several turns, each played after the voice stops talking
-      --no-notch             don't show the notch
-      --voice <name>         GPT-Live voice (default: sol)
-      --idle <seconds>       close the session after this much silence (default: 20)
+           pia-voice notch demo [--capsule|--notch] [--cycle] [--append]
 
     dictate: record, transcribe with gpt-transcribe, copy the text to the clipboard.
 
@@ -43,7 +30,6 @@ enum PiaVoiceMain {
     notch demo: the island with a fake voice — no microphone, no API key, nothing billed. For judging
     the shape, the motion and whether it follows you across Spaces and screens.
 
-      --voice                the GPT-Live intent island instead of the dictation one
       --capsule / --notch    force the other screen's shape (an external monitor has no notch)
       --cycle                walk through the states on its own
       --append               the dictation island as an appending take ("+" beside the clock)
@@ -54,7 +40,6 @@ enum PiaVoiceMain {
         var args = Array(CommandLine.arguments.dropFirst())
         let command = args.isEmpty ? "" : args.removeFirst()
         switch command {
-        case "intent": runIntent(args)
         case "dictate": runDictate(args)
         case "transcribe": runTranscribe(args)
         case "notch": runNotch(args)
@@ -66,51 +51,6 @@ enum PiaVoiceMain {
     static func fail(_ message: String) -> Never {
         FileHandle.standardError.write((message + "\n").data(using: .utf8)!)
         exit(1)
-    }
-
-    // MARK: intent
-
-    static func runIntent(_ arguments: [String]) {
-        var args = arguments
-        guard !args.isEmpty else { fail(usage) }
-        var options = Options(workDir: URL(fileURLWithPath: args.removeFirst()).standardizedFileURL)
-        while !args.isEmpty {
-            let flag = args.removeFirst()
-            func value() -> String {
-                guard !args.isEmpty else { fail("missing value for \(flag)") }
-                return args.removeFirst()
-            }
-            switch flag {
-            case "--prompts": options.promptsDir = value()
-            case "--input-file": options.inputFiles.append(URL(fileURLWithPath: value()))
-            case "--no-notch": options.showNotch = false
-            case "--voice": options.voice = value()
-            case "--backend-model": options.backendModel = value()
-            case "--hotkey":
-                let text = value()
-                if text.lowercased() == "off" { options.hotkey = nil }
-                else if let spec = HotkeySpec.parse(text) { options.hotkey = spec }
-                else { fail("shortcut \"\(text)\" not understood") }
-            case "--idle": options.idleSeconds = Double(value()) ?? 20
-            default: fail("unknown option \(flag)\n\(usage)")
-            }
-        }
-        guard FileManager.default.fileExists(atPath: options.workDir.path) else {
-            print("PIA-VOICE ERROR {\"message\":\"work folder not found: \(options.workDir.path)\"}")
-            exit(2)
-        }
-
-        setvbuf(stdout, nil, _IOLBF, 0)
-        let app = NSApplication.shared
-        app.setActivationPolicy(.accessory)
-
-        MainActor.assumeIsolated {
-            let session = IntentSession(options: options)
-            onSignals([SIGTERM, SIGINT, SIGHUP]) { session.end(reason: "stopped by the Lead") }
-            DispatchQueue.main.async { MainActor.assumeIsolated { session.start() } }
-            retained = session
-        }
-        app.run()
     }
 
     // MARK: dictate
@@ -195,8 +135,6 @@ enum PiaVoiceMain {
         var options = NotchDemoOptions()
         while !args.isEmpty {
             switch args.removeFirst() {
-            case "--voice": options.island = "voice"
-            case "--dictation": options.island = "dictation"
             case "--capsule": options.forcedStyle = .capsule
             case "--notch": options.forcedStyle = .notch
             case "--cycle": options.cycle = true

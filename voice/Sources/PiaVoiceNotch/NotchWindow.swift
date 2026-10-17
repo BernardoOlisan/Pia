@@ -28,7 +28,7 @@ final class NotchPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-/// Shows the island: the whole time for the intent, only while dictating for transcribe.
+/// Shows the island while dictating.
 ///
 /// It follows the human across Spaces and across screens. `canJoinAllSpaces` alone is not enough in
 /// practice — a panel that was ordered front on one Space can stop being drawn on another after a
@@ -44,11 +44,6 @@ public final class NotchWindow {
     private var reported: NotchGeometry?
     /// Set by the mockup to print what the window is doing.
     public var diagnostics: ((String) -> Void)?
-
-    public convenience init(model: NotchModel, stage: IslandStage? = nil) {
-        let stage = stage ?? IslandStage()
-        self.init(stage: stage, maxSideWidth: NotchView.maxSideWidth) { NotchView(model: model, stage: stage) }
-    }
 
     public convenience init(dictation model: DictationModel, stage: IslandStage? = nil) {
         let stage = stage ?? IslandStage()

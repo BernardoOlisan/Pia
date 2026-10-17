@@ -4,8 +4,6 @@ import PiaVoiceCore
 import PiaVoiceNotch
 
 struct NotchDemoOptions {
-    /// `dictation` (Voice Memos) or `voice` (the GPT-Live intent island).
-    var island = "dictation"
     /// Pin a style so an external monitor's capsule can be seen on the built-in screen, and the other way round.
     var forcedStyle: IslandStyle?
     /// Walk through the states on its own instead of waiting for clicks.
@@ -23,7 +21,6 @@ struct NotchDemoOptions {
 final class NotchDemo {
     private let options: NotchDemoOptions
     private let dictation = DictationModel()
-    private let voice = NotchModel()
     private let stage = IslandStage()
     private var window: NotchWindow!
     private var talking = false
@@ -37,16 +34,10 @@ final class NotchDemo {
     }
 
     func start() {
-        if options.island == "voice" {
-            voice.connected = true
-            voice.onDotClick = { [weak self] in self?.advance() }
-            window = NotchWindow(model: voice, stage: stage)
-        } else {
-            dictation.phase = .recording
-            dictation.appending = options.appending
-            dictation.onTap = { [weak self] in self?.advance() }
-            window = NotchWindow(dictation: dictation, stage: stage)
-        }
+        dictation.phase = .recording
+        dictation.appending = options.appending
+        dictation.onTap = { [weak self] in self?.advance() }
+        window = NotchWindow(dictation: dictation, stage: stage)
         if !options.quiet {
             window.diagnostics = { line in
                 FileHandle.standardError.write(("notch · " + line + "\n").data(using: .utf8)!)
@@ -62,7 +53,7 @@ final class NotchDemo {
         }
 
         say("""
-        PIA notch mockup — \(options.island == "voice" ? "GPT-Live voice" : "dictation (Voice Memos)")\
+        PIA notch mockup — dictation (Voice Memos)\
         \(options.forcedStyle == .capsule ? ", forced capsule (external-monitor shape)" : "")\
         \(options.forcedStyle == .notch ? ", forced notch" : "")
           · one click  → next state
@@ -90,19 +81,12 @@ final class NotchDemo {
             level = Float(Double.random(in: 0...0.05))
         }
 
-        if options.island == "voice" {
-            voice.push(level: level)
-            voice.voiceSpeaking = talking
-            voice.elapsed = now.timeIntervalSince(startedAt)
-            voice.cost = String(format: "$%.2f", voice.elapsed / 60 * 0.05)
-        } else {
-            if dictation.phase == .recording {
-                dictation.push(level: level)
-                dictation.elapsed = now.timeIntervalSince(startedAt)
-                seconds = dictation.elapsed
-            }
-            dictation.cost = DictationLedger.label(seconds / 60 * Transcription.dollarsPerMinute)
+        if dictation.phase == .recording {
+            dictation.push(level: level)
+            dictation.elapsed = now.timeIntervalSince(startedAt)
+            seconds = dictation.elapsed
         }
+        dictation.cost = DictationLedger.label(seconds / 60 * Transcription.dollarsPerMinute)
 
         if options.cycle, now >= cycleAt {
             cycleAt = now.addingTimeInterval(dictation.phase == .recording ? 6 : 2.2)
@@ -112,13 +96,6 @@ final class NotchDemo {
 
     /// One click: the next state, so every transition can be watched on demand.
     private func advance() {
-        guard options.island != "voice" else {
-            // open → asleep → asleep with something from Claude → open
-            if voice.connected { voice.connected = false }
-            else if !voice.waiting { voice.waiting = true }
-            else { voice.waiting = false; voice.connected = true }
-            return
-        }
         switch dictation.phase {
         case .recording: dictation.phase = .transcribing
         case .transcribing: dictation.phase = .done

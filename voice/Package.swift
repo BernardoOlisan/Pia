@@ -1,7 +1,7 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
-// PIA Voice: talk through a PIA intent with GPT-Live, from the notch.
+// PIA Voice: dictation from the notch (/pia:transcribe, ⌥Space), transcribed with gpt-transcribe.
 // Build: swift build -c release --package-path voice
 let package = Package(
     name: "pia-voice",
@@ -9,18 +9,12 @@ let package = Package(
     products: [
         .executable(name: "pia-voice", targets: ["pia-voice"]),
     ],
-    dependencies: [
-        // Only for Silero VAD (local voice activity detection).
-        .package(url: "https://github.com/soniqo/speech-swift", exact: "0.0.23"),
-    ],
     targets: [
-        // GPT-Live protocol, tools, intent.md, bridge lines, cost, keychain. No UI, no audio.
+        // Transcription, the dictation buffer and ledger, keychain. No UI, no audio.
         .target(name: "PiaVoiceCore"),
-        // Microphone, speaker (with echo cancellation) and the local VAD.
-        .target(name: "PiaVoiceAudio", dependencies: [
-            .product(name: "SpeechVAD", package: "speech-swift"),
-        ]),
-        // The notch: shape, dot, cost, voice meter, speaking pulse.
+        // The microphone and the recorder.
+        .target(name: "PiaVoiceAudio"),
+        // The notch island: shape, waveform, clock, cost.
         .target(name: "PiaVoiceNotch"),
         .executableTarget(name: "pia-voice", dependencies: ["PiaVoiceCore", "PiaVoiceAudio", "PiaVoiceNotch"]),
         .testTarget(name: "PiaVoiceCoreTests", dependencies: ["PiaVoiceCore"]),
