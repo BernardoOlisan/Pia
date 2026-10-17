@@ -73,7 +73,31 @@ def describe(d, kind):
         "round": state.get("round", 0),
         "mode": state.get("mode", ""),
         "lead_session": state.get("lead_session", ""),
+        "now": now_fields(os.path.join(d, "log.md")),
+        "agents": agent_logs(d),
     }
+
+
+def now_fields(path):
+    """The `## Now` bullets of a log, as {label: value}."""
+    out = {}
+    for line in now_section(path):
+        m = re.match(r"^- \*\*([^:*]+):\*\*\s*(.*)$", line)
+        if m:
+            out[m.group(1).strip().lower()] = m.group(2).strip()
+    return out
+
+
+def agent_logs(d):
+    """Each agent's name, and what its own log's `## Now` says (doing, updated)."""
+    logs = os.path.join(d, "logs")
+    out = []
+    if os.path.isdir(logs):
+        for name in sorted(os.listdir(logs)):
+            if name.endswith(".md"):
+                now = now_fields(os.path.join(logs, name))
+                out.append({"name": name[:-3], "doing": now.get("doing", ""), "updated": now.get("updated", "")})
+    return out
 
 
 def listing(root):
@@ -148,6 +172,23 @@ def main(argv):
             w = json.loads(line)
             if w["lead_session"] == args[0]:
                 print(w["dir"])
+    elif cmd == "_title":
+        # stdin: a SessionStart or UserPromptSubmit hook input; prints the hook output naming the session.
+        try:
+            hook = json.load(sys.stdin)
+        except ValueError:
+            return
+        root = project_root(args[0] if args else None)
+        led = [w for w in listing(root) if w["lead_session"] == hook.get("session_id") and w["phase"] not in ("done", "")]
+        if not led:
+            return
+        w = led[0]
+        number = w["id"].split("-")[0]
+        title = f"PIA desechable {number}" if w["kind"] == "disposable" else f"PIA lead {number}"
+        if hook.get("session_title") == title:
+            return
+        event = hook.get("hook_event_name") or "UserPromptSubmit"
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": event, "sessionTitle": title}}))
     elif cmd == "resume" and args:
         resume(args[0], project_root(args[1] if len(args) > 1 else None))
     elif cmd == "next-id" and args:

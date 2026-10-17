@@ -1,5 +1,8 @@
 {
-  "description": "PIA: restore where the work stands after compaction (PIA sessions only), stop keep-awake when the lead's session ends, notify the human (in-the-loop PIA sessions only) when Claude Code waits on them, and dictation (/pia:transcribe[ follow] and ⌥Space / ⌥⇧Space) without going through Claude",
+  "description": "PIA: name lead sessions after their work, restore where the work stands after compaction (PIA sessions only), stop keep-awake when the lead's session ends, notify the human (in-the-loop PIA sessions only) when Claude Code waits on them, and dictation (/pia:transcribe[ follow] and ⌥Space / ⌥⇧Space) without going through Claude",
+  "modules": [
+    "./register.tsx"
+  ],
   "hooks": {
     "SessionStart": [
       {
@@ -17,6 +20,15 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/dictate-start.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/session-title.sh\""
           }
         ]
       }
@@ -49,6 +61,16 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/notify-hook.sh\""
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/session-title.sh\""
           }
         ]
       }

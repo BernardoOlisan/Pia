@@ -8,5 +8,14 @@
   },
   "homepage": "https://github.com/BernardoOlisan/Pia",
   "repository": "https://github.com/BernardoOlisan/Pia",
-  "keywords": ["decision-driven-development", "ddd", "agents", "agent-teams", "workflow", "research", "planning"]
+  "keywords": [
+    "decision-driven-development",
+    "ddd",
+    "agents",
+    "agent-teams",
+    "workflow",
+    "research",
+    "planning"
+  ],
+  "types": "./types/index.d.ts"
 }
