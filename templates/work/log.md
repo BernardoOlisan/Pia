@@ -4,6 +4,7 @@
 
 ## Now
 - **Phase:** talk
+- **Round:** 0
 - **Doing:** talking with the human while the scout investigates
 - **Team:** scout-{NNN}
 - **Next:** decisions

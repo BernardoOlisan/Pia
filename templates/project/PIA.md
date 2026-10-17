@@ -22,7 +22,7 @@ It is owned by the plugin and refreshed by `/pia:init`. Don't edit it by hand. A
 ├── config.json            project defaults: mode, auto-compact window (tokens)
 ├── .gitignore             ignores *.pid and the ID lock
 └── work/<NNN-slug>/       one folder per intention (feature, fix, anything)
-    ├── state.json         id, title, mode, phase, lead session
+    ├── state.json         id, title, mode, phase, round, lead session
     ├── talk.md            👤 the conversation: the intention, what was found, what the human decided
     ├── research.md        🤖 exhaustive research, written while the talk is happening
     ├── decisions.md       👤 the decision map
@@ -36,12 +36,14 @@ It is owned by the plugin and refreshed by `/pia:init`. Don't edit it by hand. A
 ## Phases
 
 ```
-talk → decisions → [stop here if mode = in-the-loop] → implement → test → done
+talk → decisions → [stop here if mode = in-the-loop] → implement → test (round 1, 2, 3…) → done
 ```
 
-`state.json` → `phase` is one of: `talk`, `decisions`, `awaiting-review`, `implement`, `test`, `done`. Whoever moves a work to a new phase updates `phase` and `updated`.
+`state.json` → `phase` is one of: `talk`, `decisions`, `awaiting-review`, `implement`, `test`, `done`. Whoever moves a work to a new phase updates `phase` and `updated`. `state.json` → `round` counts the rounds of test feedback: `0` while the work is being built, then `1`, `2`, `3`… (a `state.json` without `round` is at `0`).
 
 **There is no plan phase and no plan document.** The implementer works out its own steps from the decision map and the research, and keeps them as a short checklist in its log. A model plans its own work well; a separate planning stage only restates what is already written.
+
+**`test` is the long phase, and it is open-ended.** Finishing an implementation never finishes the work: it means *waiting for the human to test it*. Rounds of feedback follow for as long as the human wants — days or weeks, with gaps in between. **Only the human closes a work** ("it's done", "ciérrala"). Until they say so the work stays in `test`, however long it sits there, and nothing an agent does or finishes moves it to `done`.
 
 ## Mode
 
@@ -52,36 +54,44 @@ The project default lives in `.pia/config.json`; each work has its own `mode` in
 
 **The lead checks `mode` before every question it would put to the human**, not once at the end. The talk is where the human is needed most, so the talk is where a switch has to take effect; a lead that only reads the mode later keeps asking an empty chair.
 
-## Keep-awake (caffeinate)
+## Keep-awake
 
-While agents work unattended, the machine must not sleep.
+While agents work unattended, the machine must not sleep — not even with the lid closed and the Mac in a backpack.
 
-- **Start:** at the very beginning of every new work, and whenever a stopped work starts running again: run `caffeinate -dims` in the background and save its PID to `.pia/work/<id>/caffeinate.pid`. In Claude Code it also watches the Claude process (`-w`), so it exits by itself if Claude closes or crashes.
+- **Start:** at the very beginning of every new work, whenever a stopped work starts running again, and at the start of **every** test round and quick fix (Phase 4): `awake.sh start`.
 - **Stop:** as soon as the work is waiting for the human or finished:
   - mode `in-the-loop` → when the decision map is finished (phase `awaiting-review`);
-  - mode `out-of-the-loop` → at the end of everything, when implementation is finished (phase `test`);
+  - when an implementation or a round is finished and the work waits for the human's test (phase `test`);
   - any mode → when the work has to wait (see *Works in parallel*), or when the lead's session ends.
-- Stop means: kill **only** the PID saved in that work's `caffeinate.pid`, only if that PID is still a `caffeinate` process, then delete the file. Never kill other `caffeinate` processes; another work may own them.
+- **How it works.** `start` runs `caffeinate -dims` for the work (its PID in the work's `caffeinate.pid`; it watches the Claude process, so it dies with Claude) and registers the work with **PIA Awake**, which keeps the Mac awake with the lid closed while *any* registered work is still running, and lets it sleep again the moment none is. With the lid closed it turns the screen off, saves battery (Low Power Mode at 40 %), stops at 10 % battery or critical heat, and joins the iPhone's hotspot if the Wi-Fi drops. Without PIA Awake installed, only `caffeinate` runs, and closing the lid still sleeps the Mac.
+- Stop means: only this work lets go. Kill **only** the PID in that work's `caffeinate.pid`, only if it is still a `caffeinate` process; another work may own the others.
 
-In Claude Code: `bash "<plugin>/scripts/awake.sh" start|stop|status .pia/work/<id>`.
+In Claude Code: `bash "<plugin>/scripts/awake.sh" start|stop|status <work folder>`.
 
 ## Team
 
 | Role | Who | Writes |
 |---|---|---|
-| **Lead** | the session the human talks to | `state.json`, `talk.md`, `log.md`, messages to the human |
+| **Lead** | the session the human talks to | `state.json`, `talk.md`, `log.md`, messages to the human, the `.pia/` commit at the end of each round |
 | **Scout** | teammate `scout-<NNN>` | `research.md`, `decisions.md`, lines in `DECISIONS.md` |
 | **Scout reviewer** | teammate `scout-reviewer-<NNN>` | nothing but its own log and messages |
-| **Implementer** | teammate `implementer-<NNN>`; a fresh `implementer-<NNN>-2`, `-3`… for each round of test feedback | code, its own step checklist |
+| **Implementer** | teammate `implementer-<NNN>`, then one per test round (below) | code, its own step checklist |
 
-`<NNN>` is the work number. Every agent also writes its own `logs/<its name>.md`.
+**Names say the work, the round and the attempt**, so the logs read in order:
+
+- `<role>-<NNN>` — the first one of its role while the work is built (round 0). `implementer-002`.
+- `<role>-<NNN>-<round>-<attempt>` — everything in a test round. `implementer-002-3-1` is work 002, round 3, first implementer; if it has to be replaced, `implementer-002-3-2`. A round that needs research has `scout-002-3-1` and `scout-reviewer-002-3-1`.
+- A replacement during the build is round 0: `implementer-002-0-2`.
+
+Every agent also writes its own `logs/<its name>.md`. Works started with older PIA keep their old names (`implementer-002-5`, `-5w`); new agents in them follow this scheme from the current round on.
 
 - **How agents are spawned.** In Claude Code with agent teams enabled, the lead spawns each role as a teammate by calling the Agent tool with a `name`. Without agent teams, the same names spawn named subagents. Either way, agents talk only through `SendMessage`, addressing each other by name.
-- **Spawn prompt.** Every teammate gets: its role, the work id and folder, the names of the agents it talks to, the paths of the log script and the decision ID script, and the instruction to read this file first (sections *All agents*, *Team*, and its own phase sections) plus `AGENTS.md`, `.pia/DECISIONS.md`, `state.json` and `talk.md`.
+- **Spawn prompt.** Every teammate gets: its role, the work id and folder, the round, the names of the agents it talks to, the paths of the log script and the decision ID script, and the instruction to read this file first (sections *All agents*, *Team*, and its own phase sections) plus `AGENTS.md`, `.pia/DECISIONS.md`, `state.json` and `talk.md`.
 - **The lead keeps its context small.** It coordinates; it does not read `research.md` end to end. It asks the scout and gets short answers.
 - **One writer per file.** Only the owner in the table above edits a file.
-- **Replacement.** If a teammate fails, stops early, or runs out of context, the lead spawns a replacement with the same role and name suffix `-2`, `-3`… It resumes from the files, the `## Now` of `log.md`, and the log of the agent it replaces. If Claude Code says the human stopped that agent (for example by interrupting or restarting Claude Code), ask the human in one line before replacing it: Claude Code requires that.
-- **Shutdown.** When a phase is finished, the lead asks the agents of that phase to shut down. The implementer shuts down at `IMPLEMENTATION DONE`; test feedback goes to a fresh one (Phase 4).
+- **Nobody goes quiet.** A teammate that is working sends the lead something at least every 15 minutes (a `STEP DONE`, or one line saying what it is on). A teammate waiting on something — a build, a test run, a notification — says what and for how long, and checks it itself instead of waiting for a message that may never come. **The lead checks, not trusts:** when a teammate has been silent past that, the lead looks at its log and the processes before telling the human it is working, and replaces it if it is stuck.
+- **Replacement.** If a teammate fails, stops early, or runs out of context, the lead spawns a replacement with the same role and the next attempt number. It resumes from the files, the `## Now` of `log.md`, and the log of the agent it replaces. If Claude Code says the human stopped that agent (for example by interrupting or restarting Claude Code), ask the human in one line before replacing it: Claude Code requires that.
+- **Shutdown.** When a phase is finished, the lead asks the agents of that phase to shut down. The implementer shuts down at `IMPLEMENTATION DONE` or `FIXES DONE`; the next round gets a fresh one (Phase 4).
 
 ## All agents
 
@@ -93,7 +103,9 @@ In Claude Code: `bash "<plugin>/scripts/awake.sh" start|stop|status .pia/work/<i
 4. **After compaction or a restart**, before doing anything: re-read this file (*All agents* and your phase sections), `state.json`, the `## Now` of `log.md`, and your own log. Re-read **only those parts** (ranged reads, or search for the section), not whole documents: re-reading everything after every compaction fills the context again and can make compaction loop.
 5. **Only the lead talks to the human.** Anything else that would need a human answer becomes a decision: decide it and record it.
 6. **Don't execute destructive or outward-facing actions** (force-push, pushing to a protected branch, deleting data, spending money, messaging people, deploying to production) unless `talk.md` or a decision explicitly authorizes it. Otherwise record it as a decision and leave the action for the human.
-7. All PIA documents are written in **English**. The lead talks to the human in the human's language.
+7. All PIA documents are written in **English**. The lead talks to the human in the human's language — every message, including the ones right after a teammate's report in English.
+9. **The checkout is shared.** Several agents, and the lead's uncommitted files, live in the same working tree. Never run anything that throws away work you didn't make: no `git reset --hard`, `git checkout -- <path>`, `git restore` of others' files, `git clean -f`, `git stash` of everything, or rebasing a shared branch. To take your own commits back, use `git revert`, or move them to a branch. Commit only your own files.
+10. **PIA's own files are committed once per round, by the lead.** Teammates never commit `.pia/` (logs, cards, research); the lead commits the whole `.pia/` folder in one `docs(pia): work NNN round R` commit when a round (or the build) ends, and whenever the human asks for a push.
 8. **Images fill the context fast.** Shrink screenshots before reading them (on macOS: `sips -Z 1000 <file>`), and don't read the same image twice.
 
 ## Writing for the human
@@ -198,16 +210,37 @@ The implementer plans its own work. There is no plan document to follow.
 5. **After each step**, send the lead `STEP DONE <n> of <total>: <one line>`. The lead logs it, so its `## Now` shows real progress.
 6. When everything is done, tell the lead `IMPLEMENTATION DONE` with: what was built (3 to 5 bullets), how to test it (short numbered steps), and what you could not verify yourself.
 
-**Lead:** set phase `test`, **stop caffeinate**, shut down the implementer, and send the human that summary, short. If the work ran `out-of-the-loop`, open with the cards that say *you were away*: those are the questions you would have put to them.
+**Lead:** set phase `test` (round stays `0`), **stop keep-awake**, shut down the implementer, commit `.pia/`, and send the human that summary, short. If the work ran `out-of-the-loop`, open with the cards that say *you were away*: those are the questions you would have put to them. The work now waits for the human's test — it is **not** done.
 
-## Phase 4: Test (human ⇄ lead ⇄ implementer)
+## Phase 4: Test, in rounds (human ⇄ lead ⇄ implementer)
 
-- The human tests and gives feedback to the lead. **The feedback is more of the talk:** the lead appends it to `## The conversation` in `talk.md`, in order, with its date. It does not go anywhere else and it is not a new round of anything.
-- **If feedback contradicts a decision**, the lead first records it as a changed decision (see *Changing a decision*); the human's feedback counts as the go.
-- **Each round of feedback gets a fresh implementer** (`implementer-<NNN>-2`, then `-3`…), with the round's items in its spawn prompt. It resumes from `decisions.md`, the latest part of `talk.md`, and the previous implementer's log and checklist, so it starts with a clean context. Later items from the same round go to it by message. Start caffeinate while it works and stop it when it reports.
-- The implementer fixes each item (a failing test first, then the code), logs each fix with the log script (what failed, why it failed, the fix), and tells the lead `FIXES DONE` with the same short summary as `IMPLEMENTATION DONE`. Then the lead shuts it down.
-- **Open questions before closing.** Whenever the lead asks the human about a decision, it logs `ASKED D-NNN: <question>`, and `ANSWERED D-NNN` when the human answers. Before setting `done`, the lead lists every question still unanswered and asks once more. If the human closes without answering, those cards keep the agent's decision.
-- When the human says it's done: **mark every card still `Status: agent` as `approved`** (in `decisions.md` and `DECISIONS.md`), set phase `done`, and shut down the team.
+The human tests and gives feedback. **Each batch of feedback is a round.** Rounds keep coming until the human closes the work.
+
+**A round, step by step:**
+
+1. **Open it.** `round` + 1 in `state.json`, log `ROUND <R> opened`, and append the feedback to `## The conversation` in `talk.md` under `### <date> · Round <R>`, numbered, in the human's own terms. The feedback is more of the talk; it does not go anywhere else.
+2. **Decisions first.** Feedback that contradicts a decision is recorded as a changed decision before anything is built (see *Changing a decision*); the human's feedback counts as the go. A new constraint is a new card.
+3. **Ask only what you can't decide.** Before asking the human anything about the feedback, check `talk.md`: if they already said it, don't ask again — and never pass on a teammate's question the human has already answered; answer it from `talk.md` yourself.
+4. **Build it** with the right size of help:
+   - **Normal round:** a fresh `implementer-<NNN>-<R>-1` with the round's items in its spawn prompt. It resumes from `decisions.md`, the round in `talk.md`, and the previous implementer's log and checklist. Later items of the same round go to it by message.
+   - **A round that is really new ground** (a redesign, a new behaviour nobody researched): a scout and reviewer first (`scout-<NNN>-<R>-1`), new cards, then the implementer — still inside this work and this round.
+   - **Quick fix:** see below.
+5. **Keep-awake on** while anyone works on the round; **off** when it reports.
+6. **Close it.** The implementer fixes each item (a failing test first when the item is a bug, then the code), logs each fix, and tells the lead `FIXES DONE` with the same short summary as `IMPLEMENTATION DONE`. The lead shuts it down, commits `.pia/`, logs `ROUND <R> done`, and tells the human: what changed per item, how to test it, what couldn't be verified. Phase stays `test`.
+
+**Quick fix: the lead does it, still inside PIA.** Some feedback is too small or too interactive for a fresh implementer: a deploy that keeps failing while the human pastes the logs, one wrong label, running something locally so the human can look at it. Then the lead does it itself, and it is still PIA work:
+- every action goes through the log script, starting with `QUICK FIX` (`QUICK FIX: Railway build fails on missing log dir → added mkdir to the Dockerfile`);
+- the round is opened and closed exactly as above, and changed decisions are recorded first;
+- keep-awake on while it works, off when it waits for the human;
+- if it grows past a handful of edits, or the human is going away, hand it to an implementer.
+
+A lead that stops logging because "this is just a quick one" is the failure this rule exists for: the next session finds a work whose logs end where the real work started.
+
+**Nothing happens outside the work.** In a lead session, everything the human asks about the work — a question, a fix, a deploy, a "can you check…" — is part of the work: log it and keep `talk.md` current. If the work was `done`, reopen it (phase `test`, a new round) instead of answering outside PIA.
+
+**Open questions before closing.** Whenever the lead asks the human about a decision, it logs `ASKED D-NNN: <question>`, and `ANSWERED D-NNN` when the human answers. Before setting `done`, the lead lists every question still unanswered and asks once more. If the human closes without answering, those cards keep the agent's decision.
+
+**Closing.** Only when the human says the work is done: **mark every card still `Status: agent` as `approved`** (in `decisions.md` and `DECISIONS.md`), set phase `done`, commit `.pia/`, and shut down the team.
 
 ## Approving the map
 

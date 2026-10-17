@@ -2,7 +2,7 @@
 """Write one PIA log entry and refresh the log's "## Now" in the same step.
 
     log.sh <log file> "<what happened>" --doing "<what you're doing now>"
-           [--next "..."] [--blockers "..."] [--phase "..."] [--team "..."]
+           [--next "..."] [--blockers "..."] [--phase "..."] [--round N] [--team "..."]
 
 The time comes from the machine clock, so it is never guessed. `--doing` is required: every
 entry also says what the agent is doing now, so "## Now" never goes stale.
@@ -13,7 +13,7 @@ import os
 import sys
 import tempfile
 
-NOW_FIELDS = [("phase", "Phase"), ("doing", "Doing"), ("team", "Team"), ("next", "Next"), ("blockers", "Blockers")]
+NOW_FIELDS = [("phase", "Phase"), ("round", "Round"), ("doing", "Doing"), ("team", "Team"), ("next", "Next"), ("blockers", "Blockers")]
 
 
 def section_bounds(lines, title):

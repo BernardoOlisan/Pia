@@ -67,14 +67,16 @@ Spawn teammates with the Agent tool, **always passing a `name`** (with agent tea
 > Log only with the log script: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh" .pia/work/{id}/logs/{your name}.md "<what happened>" --doing "<what you're doing now>"`.
 > Templates for work files: `${CLAUDE_PLUGIN_ROOT}/templates/work/`. Decision ID script: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/next-decision-id.sh" <project root> {id} <count>`.
 > {For the scout during the talk: the lead will send you what to look at and direct questions. Answer in two or three lines, never with a document.}
-> {For a replacement or a test-round implementer: resume from the files, the `## Now` of `log.md`, and `logs/{previous agent}.md`. The items to fix: …}
+> {For a replacement or a test-round implementer: this is round {R}. Resume from the files, the `## Now` of `log.md`, and `logs/{previous agent}.md`. The items to fix: …}
+> Never go quiet: message the lead at least every 15 minutes, and check on anything you wait for yourself. Never commit `.pia/`, and never run `git reset --hard`, `git checkout --`, `git clean` or anything else that throws away work you didn't make (PIA.md → All agents 9–10).
 
 | When | Spawn | Their sections |
 |---|---|---|
 | The moment the work is created | `scout-<NNN>` | Phase 1 (its part), Phase 2 |
 | When the talk ends | `scout-reviewer-<NNN>` | Reviewing |
 | Implement | `implementer-<NNN>` | Phase 3 |
-| Each round of test feedback | a fresh `implementer-<NNN>-2`, `-3`… | Phase 3, Phase 4 |
+| Each round R of test feedback | a fresh `implementer-<NNN>-<R>-1` (a replacement is `-<R>-2`) | Phase 3, Phase 4 |
+| A round that is new ground | `scout-<NNN>-<R>-1`, `scout-reviewer-<NNN>-<R>-1`, then the implementer | Phase 2, Reviewing, Phase 4 |
 
 As lead:
 - Keep `state.json` (`phase`, `updated`) current, and log with the script: phase changes, spawns, replacements, every report from a teammate (`STEP DONE`, `APPROVED`, `DECISIONS DONE`, …) and every message to or from the human.
@@ -98,9 +100,9 @@ Check the other works' `state.json` (PIA.md → *Works in parallel*). If another
 
 ## 7. When implementation is finished
 
-1. Set phase `test`.
-2. **Stop caffeinate:** `bash "${CLAUDE_PLUGIN_ROOT}/scripts/awake.sh" stop .pia/work/<id>`.
-3. Shut down the implementer.
+1. Set phase `test` (round stays `0`). **The work is not done**: it now waits for the human's test, and rounds of feedback follow until the human closes it.
+2. **Stop keep-awake:** `bash "${CLAUDE_PLUGIN_ROOT}/scripts/awake.sh" stop .pia/work/<id>`.
+3. Shut down the implementer, and commit `.pia/` in one `docs(pia): work <NNN> round 0` commit.
 4. Tell the human, short (PIA.md → *Writing for the human*): what was built, how to test it (numbered steps), what couldn't be verified, and any decision you need them to confirm (log each as `ASKED D-NNN: …`).
 
-Then handle their test feedback per PIA.md → Phase 4: append it to `## The conversation` in `talk.md`, record changed decisions first, then a fresh implementer for each round, with caffeinate on while it works. Before `done`, ask once more about every `ASKED` decision still unanswered. When they say it's done: mark every card still `Status: agent` as `approved`, set phase `done`, and shut down the team.
+Then every batch of feedback is a round (PIA.md → Phase 4): open it (`round` + 1, `talk.md`), record changed decisions first, build it with a fresh `implementer-<NNN>-<R>-1` — or a quick fix done by you, logged as `QUICK FIX` — with keep-awake on while it works, and close it. **Only the human closes the work.** When they say it's done: ask once more about every `ASKED` decision still unanswered, mark every card still `Status: agent` as `approved`, set phase `done`, commit `.pia/`, and shut down the team.
