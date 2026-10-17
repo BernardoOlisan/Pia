@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/pia-owl.svg" width="128" alt="PIA, a pixel-art owl"></p>
+
 # PIA
 
 **Decision Driven Development (DDD).** A good agentic system, given an intention, resources and context, should work for hours, even all night. Your attention goes only to the decisions.
