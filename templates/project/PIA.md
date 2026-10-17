@@ -298,7 +298,7 @@ The human is not watching the terminal. While a work is **in the loop**, PIA tel
 
 These come from the lead's own log entries, so **log those moments with exactly those words**; nothing else has to be done. Out of the loop, nothing is sent: the human said they are away.
 
-In Claude Code, the lead session also shows the work above the prompt (the owl, phase, round, teammates, keep-awake), and is named `PIA lead <NNN>` so the human can resume it by name.
+In Claude Code, the lead session also shows the work above the prompt (the owl, phase, round, teammates, keep-awake), and is named `PIA lead <NNN>` (`PIA disposable <NNN>`) so the human can resume it by name.
 
 ## Works in parallel
 

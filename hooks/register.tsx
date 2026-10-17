@@ -15,32 +15,29 @@ const works = atom({ plugin: 'pia', key: 'works' } as const, [] as BandWork[])
 const awake = atom({ plugin: 'pia', key: 'awake' } as const, null as AwakeView | null)
 const mates = atom({ plugin: 'pia', key: 'mates' } as const, [] as Mate[])
 const collapsed = atom({ plugin: 'pia', key: 'collapsed' } as const, false)
-const spanish = atom({ plugin: 'pia', key: 'spanish' } as const, true)
+const spanish = atom({ plugin: 'pia', key: 'spanish' } as const, false)
 
-// The 16×16 owl of the README, two pixels per terminal cell (▀: top in the foreground, bottom behind).
+// The README's owl, drawn by hand at 8×8 so the band stays four rows tall: ears, amber eyes with their
+// pupils, the beak, the light belly, the wing line and the feet. Two pixels per terminal cell: ▀ paints
+// the top one in the foreground and the bottom one behind it; ▄ when only the bottom one is there.
+// The outline is lighter than the README's so it reads on a dark terminal.
 const OWL = [
-  '.DD..........DD.',
-  '.DBD........DBD.',
-  '.DBBDDDDDDDDBBD.',
-  '.DBBBBBBBBBBBBD.',
-  'DBBEEEBBBBEEEBBD',
-  'DBEEEEEBBEEEEEBD',
-  'DBEEPPEBBEPPEEBD',
-  'DBEEPPEBBEPPEEBD',
-  'DBBEEEBKKBEEEBBD',
-  'DBBBBBBKKBBBBBBD',
-  'DBWLLLLLLLLLLWBD',
-  'DBWLLDLLLLDLLWBD',
-  'DBWLLLLLLLLLLWBD',
-  '.DBWLLLLLLLLWBD.',
-  '..DDBBBBBBBBDD..',
-  '....KK....KK....',
+  'DD....DD',
+  'DBBBBBBD',
+  'BEEBBEEB',
+  'BEPBBPEB',
+  'BBBKKBBB',
+  'BLLLLLLB',
+  'BWLLLLWB',
+  '.K....K.',
 ]
 const PALETTE: Record<string, number> = {
-  D: 0x1a1b3a, B: 0x3d3f9e, E: 0xffd166, P: 0x1a1b3a, K: 0xff8c42, L: 0x8d92f0, W: 0x2c2e78,
+  D: 0x6b6fd6, B: 0x3d3f9e, E: 0xffd166, P: 0x1a1b3a, K: 0xff8c42, L: 0x8d92f0, W: 0x2c2e78,
 }
 const DEFAULT = 0x01000000
 const UPPER_HALF = 0x2580
+const LOWER_HALF = 0x2584
+const SPACE = 0x20
 
 function base64(bytes: Uint8Array): string {
   const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -54,16 +51,29 @@ function base64(bytes: Uint8Array): string {
   return out
 }
 
+const OWL_COLUMNS = 8
+const OWL_ROWS = 4
+
 function owlCells(): string {
-  const words = new Uint32Array(16 * 8 * 3)
+  const words = new Uint32Array(OWL_COLUMNS * OWL_ROWS * 3)
   let k = 0
-  for (let row = 0; row < 16; row += 2) {
-    for (let col = 0; col < 16; col++) {
-      const top = OWL[row]?.charAt(col) ?? '.'
-      const bottom = OWL[row + 1]?.charAt(col) ?? '.'
-      words[k++] = UPPER_HALF
-      words[k++] = PALETTE[top] ?? DEFAULT
-      words[k++] = PALETTE[bottom] ?? DEFAULT
+  for (let row = 0; row < OWL_ROWS * 2; row += 2) {
+    for (let col = 0; col < OWL_COLUMNS; col++) {
+      const top = PALETTE[OWL[row]?.charAt(col) ?? '.']
+      const bottom = PALETTE[OWL[row + 1]?.charAt(col) ?? '.']
+      if (top !== undefined) {
+        words[k++] = UPPER_HALF
+        words[k++] = top
+        words[k++] = bottom ?? DEFAULT
+      } else if (bottom !== undefined) {
+        words[k++] = LOWER_HALF
+        words[k++] = bottom
+        words[k++] = DEFAULT
+      } else {
+        words[k++] = SPACE
+        words[k++] = DEFAULT
+        words[k++] = DEFAULT
+      }
     }
   }
   return base64(new Uint8Array(words.buffer))
@@ -75,13 +85,13 @@ const WORDS = {
     round: 'ronda', working: 'trabajando', idle: 'sin moverse', waiting: 'esperando',
     holding: 'despierto', lid: 'tapa cerrada', canSleep: 'puede dormir', notInstalled: 'tapa cerrada: no instalado',
     charging: 'cargando', battery: 'batería', hotspot: 'hotspot iPhone', wifi: 'Wi-Fi', offline: 'sin red',
-    disposable: 'desechable', hide: 'Ocultar', show: 'PIA',
+    hide: 'Ocultar', show: 'PIA',
   },
   en: {
     round: 'round', working: 'working', idle: 'not moving', waiting: 'waiting',
     holding: 'awake', lid: 'lid closed', canSleep: 'may sleep', notInstalled: 'lid closed: not installed',
     charging: 'charging', battery: 'battery', hotspot: 'iPhone hotspot', wifi: 'Wi-Fi', offline: 'offline',
-    disposable: 'disposable', hide: 'Hide', show: 'PIA',
+    hide: 'Hide', show: 'PIA',
   },
 }
 
@@ -97,7 +107,7 @@ function minutesSince(stamp: string, now: number): number | null {
 
 function workLabel(w: BandWork): string {
   const number = w.id.split('-')[0]
-  return w.kind === 'disposable' ? `PIA desechable ${number}` : `PIA lead ${number}`
+  return w.kind === 'disposable' ? `PIA disposable ${number}` : `PIA lead ${number}`
 }
 
 let me = ''
@@ -189,9 +199,9 @@ export const register: Register = on => {
     home = (await $.env.get('HOME')) ?? ''
     try {
       const config = JSON.parse(await $.fs.read(`${home}/.pia/config.json`))
-      await update($, spanish, () => String(config.language ?? 'es').toLowerCase().startsWith('es'))
+      await update($, spanish, () => String(config.language ?? 'en').toLowerCase().startsWith('es'))
     } catch {
-      // No config: Spanish, the language PIA's human writes in.
+      // No config: English, PIA's default.
     }
     const stored = await $.store.get('collapsed')
     if (typeof stored === 'boolean') await update($, collapsed, () => stored)
@@ -232,7 +242,7 @@ export const register: Register = on => {
     const ui = $.ui.resolve(e)
     const { Box, Text, Button } = ui
     const owl = e.surface === 'terminal' && 'Raster' in ui
-      ? <ui.Raster key="owl" columns={16} rows={8} cells={OWL_CELLS} />
+      ? <ui.Raster key="owl" columns={OWL_COLUMNS} rows={OWL_ROWS} cells={OWL_CELLS} />
       : null
 
     const toggle = async () => {
@@ -290,7 +300,7 @@ export const register: Register = on => {
     return (
       <Box flexDirection="row" gap={2}>
         {owl}
-        <Box flexDirection="column" flexGrow={1} gap={1}>
+        <Box flexDirection="column" flexGrow={1}>
           {lines}
           {teamLine}
           {awakeLine}

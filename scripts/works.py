@@ -184,7 +184,7 @@ def main(argv):
             return
         w = led[0]
         number = w["id"].split("-")[0]
-        title = f"PIA desechable {number}" if w["kind"] == "disposable" else f"PIA lead {number}"
+        title = f"PIA disposable {number}" if w["kind"] == "disposable" else f"PIA lead {number}"
         if hook.get("session_title") == title:
             return
         event = hook.get("hook_event_name") or "UserPromptSubmit"

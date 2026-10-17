@@ -140,7 +140,7 @@ Disposable works live outside the repo, in `~/.pia/disposable/`.
 - **Unattended runs:** teammate permission prompts appear in the lead's session and would wait for you. For overnight work, run Claude Code in a permission mode that won't block, e.g. `claude --permission-mode auto`.
 - **Other sessions** in a PIA project compact normally at the same window, with nothing from PIA injected.
 - **Several works at once:** fine up to implementation; only one work implements at a time.
-- **Lead sessions are named** `PIA lead 003` (or `PIA desechable 001`): `claude --resume "PIA lead 003"` and the lead knows what to do.
+- **Lead sessions are named** `PIA lead 003` (or `PIA disposable 001`): `claude --resume "PIA lead 003"` and the lead knows what to do.
 - **Logs keep real time:** agents log through `scripts/log.sh`, which stamps the machine's clock and refreshes `## Now` on every entry.
 - **Interrupting or restarting Claude Code** stops in-process teammates. PIA picks up from the logs; Claude Code asks you before a stopped agent is replaced.
 - **Agent teams are experimental** in Claude Code. If they're off, PIA runs the same roles as named subagents.
