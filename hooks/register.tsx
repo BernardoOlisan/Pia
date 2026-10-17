@@ -104,6 +104,7 @@ let me = ''
 let root = ''
 let home = ''
 const warned = new Map<string, number>()
+let titled = ''
 
 type Dollar = EngineInterface
 
@@ -122,6 +123,15 @@ async function refresh($: Dollar) {
         })
       }
       await update($, works, () => mine)
+
+      // A new lead is named the moment its work exists, not at the next prompt (session-title.sh
+      // covers starts and resumes). /rename is Claude Code's own; it runs once per name.
+      // Only where someone looks at it: under claude -p a command's output replaces the run's result.
+      const first = mine[0]
+      if (first && titled !== workLabel(first) && (await $.session.surfaces()).length > 0) {
+        titled = workLabel(first)
+        await $.command.run({ command: 'rename', args: titled }).catch(() => undefined)
+      }
 
       let view: AwakeView | null = null
       if (mine.length) {
@@ -188,6 +198,12 @@ export const register: Register = on => {
     void refresh($)
     $.clock.every(5000, () => { void refresh($) })
     $.clock.every(60000, () => { void watchdog($) })
+    return next(e)
+  })
+
+  // A turn that created or resumed a work: draw it and name the session now, not five seconds later.
+  on('turn.complete', async ($, e, next) => {
+    await refresh($)
     return next(e)
   })
 

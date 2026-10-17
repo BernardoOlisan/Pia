@@ -12,12 +12,17 @@ const STATUS = { holdingAwake: true, installed: true, lidClosed: true, battery: 
 function world(on: Parameters<Parameters<typeof test>[1] extends infer B ? B extends (...a: infer A) => unknown ? (...a: A) => unknown : never : never>[1], session = 'S1') {
   on('session.id', async () => ({ value: session }))
   on('session.cwd', async () => ({ value: '/p' }))
+  on('session.surfaces', async () => ({ value: ['terminal'] }))
   on('env.get', async () => ({ value: '/Users/someone' }))
   on('store.get', async () => ({ value: undefined }))
   on('store.set', async () => ({ value: undefined }))
   on('fs.exists', async () => ({ value: true }))
   on('clock.every', async () => ({ value: { id: 't' } }))
   on('clock.now', async () => ({ value: Date.now() }))
+  on('command.run', async (_$: unknown, e: { command: string; args: string }) => {
+    renamed.push(`${e.command} ${e.args}`)
+    return { text: '' }
+  })
   on('session.start', async () => ({ cwd: '/p' }))
   on('fs.read', async (_$: unknown, e: { path: string }) => {
     if (e.path.endsWith('status.json')) return { value: JSON.stringify(STATUS) }
@@ -29,6 +34,8 @@ function world(on: Parameters<Parameters<typeof test>[1] extends infer B ? B ext
     value: [{ id: 'a1', teammateId: 'implementer-002-3-1@pia', status: 'running', description: '', type: 'teammate' }],
   }))
 }
+
+const renamed: string[] = []
 
 const BAND = {
   component: 'AbovePrompt' as const,
@@ -68,6 +75,7 @@ test('the band shows the work this session leads, its round, its teammate and th
   expect(await ui.find({ type: 'Text', text: /implementer-002-3-1 trabajando/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /tapa cerrada/ })).toBeDefined()
   expect(await ui.find({ key: 'owl' })).toBeDefined()
+  expect(renamed).toContain('rename PIA lead 002')
   await ui.unmount()
 })
 
