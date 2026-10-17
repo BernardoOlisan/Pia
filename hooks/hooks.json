@@ -1,5 +1,5 @@
 {
-  "description": "PIA: restore where the work stands after compaction (PIA sessions only), stop keep-awake when the lead's session ends, and dictation (/pia:transcribe[ follow] and ⌥Space / ⌥⇧Space) without going through Claude",
+  "description": "PIA: restore where the work stands after compaction (PIA sessions only), stop keep-awake when the lead's session ends, notify the human (in-the-loop PIA sessions only) when Claude Code waits on them, and dictation (/pia:transcribe[ follow] and ⌥Space / ⌥⇧Space) without going through Claude",
   "hooks": {
     "SessionStart": [
       {
@@ -38,6 +38,17 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/session-end.sh\""
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "permission_prompt|elicitation_dialog|agent_needs_input",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/notify-hook.sh\""
           }
         ]
       }

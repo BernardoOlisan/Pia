@@ -10,6 +10,7 @@ entry also says what the agent is doing now, so "## Now" never goes stale.
 import argparse
 import datetime
 import os
+import subprocess
 import sys
 import tempfile
 
@@ -90,6 +91,20 @@ def main():
         f.write(content)
     os.replace(tmp, args.file)
     print(f"logged {stamp}")
+    notify(args.file, args.text, args.phase)
+
+
+def notify(log, text, phase):
+    """The lead's own entries are what tell the human something needs them (notify.py decides)."""
+    if os.path.basename(log) != "log.md" or os.environ.get("PIA_NO_NOTIFY"):
+        return
+    cmd = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "notify.py"), "--from-log", log, text]
+    if phase:
+        cmd += ["--phase", phase]
+    try:
+        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    except OSError:
+        pass
 
 
 if __name__ == "__main__":

@@ -59,7 +59,9 @@ enum Notify {
             if let subtitle, !subtitle.isEmpty { content.subtitle = subtitle }
             content.body = body
             content.threadIdentifier = thread
-            content.sound = UNNotificationSound(named: UNNotificationSoundName("owl-\(kind).caf"))
+            // No system sound: macOS ignored the bundled one and played its default. PIA plays the
+            // owl itself below, so the sound is always the one the human chose.
+            content.sound = nil
             let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
             center.add(request) { error in
                 if let error {
@@ -75,10 +77,19 @@ enum Notify {
             if Date() > deadline { return fail("timed out waiting for macOS") }
             RunLoop.main.run(until: Date().addingTimeInterval(0.05))
         }
-        // Give the sound a moment to start before the process goes away.
-        RunLoop.main.run(until: Date().addingTimeInterval(0.4))
+        if status == 0 { playOwl(kind) }
         withExtendedLifetime(delegate) {}
         return status
+    }
+
+    /// The owl's sound for this kind, from the bundle, played to the end.
+    static func playOwl(_ kind: String) {
+        guard let url = Bundle.main.url(forResource: "owl-\(kind)", withExtension: "caf"),
+              let sound = NSSound(contentsOf: url, byReference: true)
+        else { return }
+        sound.play()
+        let end = Date().addingTimeInterval(sound.duration + 0.2)
+        while sound.isPlaying && Date() < end { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
     }
 
     static func fail(_ message: String) -> Int32 {

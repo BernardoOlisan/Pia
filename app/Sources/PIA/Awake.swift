@@ -268,7 +268,8 @@ final class Daemon {
     }
 
     private var networkLabel: String {
-        guard let path, path.status == .satisfied else { return "none" }
+        guard let path else { return "unknown" }
+        guard path.status == .satisfied else { return "none" }
         if path.usesInterfaceType(.wiredEthernet) { return "wired" }
         if path.usesInterfaceType(.wifi) { return path.isExpensive ? "hotspot" : "wifi" }
         return path.isExpensive ? "hotspot" : "other"
