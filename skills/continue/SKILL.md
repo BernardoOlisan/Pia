@@ -10,7 +10,8 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash(python3 "${CLAUDE_PLUGIN_ROOT
 
 **Work:** $ARGUMENTS
 
-1. **Find the work.** Match the argument against `.pia/work/*` (a number like `3` or `003` is enough). With no argument: if exactly one work is not `done`, use it; otherwise list the active ones (id, title, phase) and ask which.
+1. **Find the work.** `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/works.py" list` lists every work of this project, in the repo (`.pia/work/`) and disposable ones (outside it). Match the argument against their ids (a number like `3` or `003` is enough; if a repo work and a disposable one share the number, ask). With no argument: if exactly one work is not `done`, use it; otherwise list the active ones (id, kind, title, phase, round) and ask which.
+   **A disposable work** (`"kind": "disposable"`) is led by `/pia:disposable`'s rules: read `${CLAUDE_PLUGIN_ROOT}/skills/disposable/SKILL.md` and continue from its *While you work*, with the folder `works.py` gave; steps 2–3 below apply with that folder instead of `.pia/work/<id>`, and the plugin's `templates/project/PIA.md` instead of `.pia/PIA.md`.
 2. **Load it.** Read `.pia/PIA.md` completely, then the work's `state.json`, `talk.md`, the `## Now` of `log.md`, and the `## Now` of each file in `logs/`. Set `lead_session` = `${CLAUDE_SESSION_ID}` and update `updated` (time from `date '+%Y-%m-%d %H:%M'`). Log that the lead resumed, with the log script: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh" .pia/work/<id>/log.md "lead resumed" --doing "<now>" --phase <phase>`. Every later entry goes through the script too.
 3. **Continue from the phase.** You are the lead: follow `/pia:new` steps 2 to 7 (spawn prompt, team table, mode check, parallel check) and PIA.md from here.
 

@@ -21,7 +21,7 @@ It is owned by the plugin and refreshed by `/pia:init`. Don't edit it by hand. A
 ├── DECISIONS.md           project memory: 📌 Binding decisions (full text) + one line per decision
 ├── config.json            project defaults: mode, auto-compact window (tokens)
 ├── .gitignore             ignores *.pid and the ID lock
-└── work/<NNN-slug>/       one folder per intention (feature, fix, anything)
+└── work/<NNN-slug>/       one folder per intention (feature, fix, anything); disposable works live outside the repo
     ├── state.json         id, title, mode, phase, round, lead session
     ├── talk.md            👤 the conversation: the intention, what was found, what the human decided
     ├── research.md        🤖 exhaustive research, written while the talk is happening
@@ -277,6 +277,15 @@ When the human reverses or adds a constraint that governs the work ("don't commi
 ## 📌 Binding decisions
 
 The `📌 Binding` section of `DECISIONS.md` holds rules every work follows, in full text (projects that had a `docs/RULES.md` had it imported here). When a decision should hold for all future work, or the human keeps repeating the same instruction, the agent records a 🔴 decision proposing to promote it to Binding. Once decided, move its full text into the Binding section.
+
+## Disposable works
+
+A **disposable work** (`/pia:disposable`) is PIA for small or short-lived projects: the log with `## Now`, the conversation, decisions only for real forks, keep-awake, notifications, and resuming from any session with `/pia:continue` — without a team, without `/pia:init`, and **without anything in the repository**. It lives in `~/.pia/disposable/<project key>/<NNN-slug>/` (`scripts/works.py` finds it), so the project can be migrated or handed over with no trace of PIA.
+
+- The lead works directly. It may spawn a named helper for a long, separable job, but there is no scout, reviewer or decision map by default.
+- Every rule of *All agents* that applies to one agent still applies: the log script, keep-awake, the shared checkout, writing for the human.
+- Its decision IDs are local to the work until it is adopted. `/pia:disposable adopt` turns it into a normal work in `.pia/work/` with project-wide IDs; `/pia:disposable drop` deletes it after the human confirms.
+- `state.json` says `"kind": "disposable"`; its phases are `work`, `test` (rounds, as in Phase 4) and `done`.
 
 ## Works in parallel
 

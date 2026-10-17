@@ -10,6 +10,7 @@ A project has two kinds of work:
     works.py list [root]                one JSON object per work: dir, id, kind, title, phase, round, mode, lead_session
     works.py lead <session id> [root]   the works this session leads that are not done, same format
     works.py next-id <slug> [root] [--disposable]   the folder a new work should get, e.g. .../003-export-pdf
+    works.py resume <session id> [root] what a lead (or its teammates) needs after a compaction
 """
 import json
 import os
@@ -91,6 +92,40 @@ def next_id(slug, root, disposable):
     return os.path.join(base, f"{highest + 1:03d}-{slug}")
 
 
+def now_section(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            lines = f.read().split("\n")
+    except OSError:
+        return []
+    out, on = [], False
+    for line in lines:
+        if line.strip() == "## Now":
+            on = True
+        elif on and line.startswith("## "):
+            break
+        if on:
+            out.append(line)
+    return out
+
+
+def resume(session, root):
+    led = [w for w in listing(root) if w["lead_session"] == session and w["phase"] not in ("done", "")]
+    if not led:
+        return
+    print("PIA: context restored after compaction.")
+    print("Before doing anything else: re-read PIA.md (\"All agents\" and your phase sections; .pia/PIA.md, "
+          "or the plugin's templates/project/PIA.md for a disposable work), then the files below.")
+    print("If you are a teammate (not the lead), also re-read your own log: logs/<your name>.md in the work folder.")
+    for w in led:
+        kind = " (disposable)" if w["kind"] == "disposable" else ""
+        print()
+        print(f"## Work {w['id']}{kind}: {w['title']}")
+        print(f"phase: {w['phase']} · round: {w['round']} · mode: {w['mode']} · folder: {w['dir']}")
+        for line in now_section(os.path.join(w["dir"], "log.md")):
+            print(line)
+
+
 def main(argv):
     if len(argv) < 2:
         sys.exit(__doc__)
@@ -107,6 +142,14 @@ def main(argv):
         for w in listing(root):
             if w["lead_session"] == args[0] and w["phase"] not in ("done", ""):
                 print(json.dumps(w, ensure_ascii=False))
+    elif cmd == "_dirs-led-by" and args:
+        # stdin: the output of `list`; prints the folders of the works this session leads (any phase).
+        for line in sys.stdin:
+            w = json.loads(line)
+            if w["lead_session"] == args[0]:
+                print(w["dir"])
+    elif cmd == "resume" and args:
+        resume(args[0], project_root(args[1] if len(args) > 1 else None))
     elif cmd == "next-id" and args:
         disposable = "--disposable" in args
         rest = [a for a in args if a != "--disposable"]

@@ -5,10 +5,6 @@
 set -u
 
 input="$(cat)"
-root="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-work_root="$root/.pia/work"
-[ -d "$work_root" ] || exit 0
-
 case "$input" in
   *'"agent_id"'*) exit 0 ;;
 esac
@@ -17,15 +13,12 @@ session="$(printf '%s' "$input" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:
 [ -n "$session" ] || exit 0
 
 here="$(cd "$(dirname "$0")" && pwd)"
-for state in "$work_root"/*/state.json; do
-  [ -f "$state" ] || continue
-  lead="$(sed -n 's/.*"lead_session"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$state" | head -n 1)"
-  [ "$lead" = "$session" ] || continue
-  dir="$(dirname "$state")"
+root="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+python3 "$here/works.py" list "$root" 2>/dev/null | python3 "$here/works.py" _dirs-led-by "$session" | while IFS= read -r dir; do
   [ -f "$dir/caffeinate.pid" ] || continue
   bash "$here/awake.sh" stop "$dir" >/dev/null 2>&1
   if [ -f "$dir/log.md" ]; then
-    printf '%s · lead · session ended; keep-awake stopped\n' "$(date '+%Y-%m-%d %H:%M')" >> "$dir/log.md"
+    bash "$here/log.sh" "$dir/log.md" "session ended; keep-awake stopped" --doing "waiting for the lead to come back" >/dev/null 2>&1
   fi
 done
 exit 0
