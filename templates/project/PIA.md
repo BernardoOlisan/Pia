@@ -287,6 +287,19 @@ A **disposable work** (`/pia:disposable`) is PIA for small or short-lived projec
 - Its decision IDs are local to the work until it is adopted. `/pia:disposable adopt` turns it into a normal work in `.pia/work/` with project-wide IDs; `/pia:disposable drop` deletes it after the human confirms.
 - `state.json` says `"kind": "disposable"`; its phases are `work`, `test` (rounds, as in Phase 4) and `done`.
 
+## Telling the human
+
+The human is not watching the terminal. While a work is **in the loop**, PIA tells them with a macOS notification (the owl, with its own sound) when:
+
+- the decision map is ready (the lead sets `awaiting-review`);
+- a build or a round is finished (the lead logs `IMPLEMENTATION DONE`, `FIXES DONE` or `ROUND <R> done`);
+- an agent is stuck (the lead logs `STALLED: …`, or PIA's watchdog sees an implementer silent for 15 minutes);
+- the lead asked them something (`ASKED D-NNN: …`), or Claude Code waits on a permission prompt.
+
+These come from the lead's own log entries, so **log those moments with exactly those words**; nothing else has to be done. Out of the loop, nothing is sent: the human said they are away.
+
+In Claude Code, the lead session also shows the work above the prompt (the owl, phase, round, teammates, keep-awake), and is named `PIA lead <NNN>` so the human can resume it by name.
+
 ## Works in parallel
 
 Several works can run at the same time, each with its own lead session, folder and caffeinate.

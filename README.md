@@ -20,7 +20,8 @@ you: /pia:new <what you want>
   ├─ Decisions   every choice becomes a decision, already decided, reviewed once         👤 decisions.md
   │              ── mode "in-the-loop": stop here and wait for you
   ├─ Implement   the implementer works out its own steps and builds it                   🤖 logs/
-  └─ Test        you test, give feedback, agents fix — the feedback is just more talk
+  └─ Test        rounds: you test, give feedback, a fresh implementer fixes it — for as long as you want.
+                 Only you close the work.
 ```
 
 
@@ -29,7 +30,9 @@ you: /pia:new <what you want>
 - **Decisions have weight** (🔴 high, 🟡 medium, 🟢 low) and an area, so you read what matters first.
 - **Decisions are memory.** New work reads past decisions to recommend the way you'd choose.
 - **Nothing stops the work:** automatic compaction for the lead and every teammate, logs to resume from, replaceable agents.
-- **The machine stays awake** (`caffeinate -dims`) while agents work unattended, and lets go when Claude Code closes.
+- **The Mac keeps working with the lid closed** while agents work (PIA Awake), and sleeps again the moment nothing runs — with battery and heat guards, and your iPhone's hotspot if the Wi-Fi drops.
+- **The owl tells you when you're needed:** a native notification with its own sound when the map is ready, a round is done, an agent is stuck or Claude needs your permission — only while you're in the loop.
+- **You see it without asking:** above the prompt, the owl and the work — phase, round, who is working, whether the Mac is being held awake.
 
 ## A decision
 
@@ -56,6 +59,18 @@ Requires Claude Code **2.1.278+** (agent teams, teammate auto-compaction, and `A
 ```
 
 For local development, from a clone: `claude --plugin-dir /path/to/Pia`.
+
+**PIA Awake** (macOS, optional): once, in a Terminal window, so the Mac keeps working with the lid closed while a work runs —
+
+```
+bash <the plugin's folder>/scripts/awake-install.sh
+```
+
+`/pia:init` prints the exact command for your install.
+
+It asks for your password once, to install a sudoers rule for exactly four commands (`pmset -a disablesleep 1|0`, `pmset -a lowpowermode 1|0`), a LaunchAgent that puts sleep back within a minute if anything ever crashes, and, if you want, your iPhone's hotspot. `--uninstall` removes all of it. Without it PIA still runs `caffeinate`, which keeps an open Mac awake but not a closed one.
+
+The first notification asks macOS for permission; allow it. PIA's notifications speak the language in `~/.pia/config.json` (`"language": "es"`).
 
 ## Commands
 
@@ -107,13 +122,16 @@ alias pia-transcribe-reset='pkill -f "pia-voice dictate serve"; rm -f ~/Library/
 ├── DECISIONS.md      📌 Binding decisions + one line per decision ever made
 ├── config.json       default mode, compaction window
 └── work/003-export-pdf/
-    ├── state.json    phase, mode
-    ├── talk.md       👤 the conversation, open until the work is done
+    ├── state.json    phase, round, mode
+    ├── talk.md       👤 the conversation, round by round, open until you close the work
     ├── research.md   🤖
-    ├── decisions.md  👤
+    ├── decisions.md  👤 what is decided now, by weight
+    ├── decisions-history.md  🤖 what changed cards used to say
     ├── log.md        🤖 the lead's summary
-    └── logs/         🤖 one log per agent (scout, scout-reviewer, implementer)
+    └── logs/         🤖 one log per agent: implementer-003, implementer-003-2-1 (round 2), …
 ```
+
+Disposable works live outside the repo, in `~/.pia/disposable/`.
 
 👤 for you · 🤖 for agents
 
@@ -122,6 +140,7 @@ alias pia-transcribe-reset='pkill -f "pia-voice dictate serve"; rm -f ~/Library/
 - **Unattended runs:** teammate permission prompts appear in the lead's session and would wait for you. For overnight work, run Claude Code in a permission mode that won't block, e.g. `claude --permission-mode auto`.
 - **Other sessions** in a PIA project compact normally at the same window, with nothing from PIA injected.
 - **Several works at once:** fine up to implementation; only one work implements at a time.
+- **Lead sessions are named** `PIA lead 003` (or `PIA desechable 001`): `claude --resume "PIA lead 003"` and the lead knows what to do.
 - **Logs keep real time:** agents log through `scripts/log.sh`, which stamps the machine's clock and refreshes `## Now` on every entry.
 - **Interrupting or restarting Claude Code** stops in-process teammates. PIA picks up from the logs; Claude Code asks you before a stopped agent is replaced.
 - **Agent teams are experimental** in Claude Code. If they're off, PIA runs the same roles as named subagents.

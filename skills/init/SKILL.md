@@ -2,7 +2,7 @@
 name: init
 description: Set up PIA (Decision Driven Development) in this repository. Creates .pia/, imports docs/RULES.md into DECISIONS.md, moves CLAUDE.md to AGENTS.md and points it at PIA, and configures auto-compaction and agent teams.
 disable-model-invocation: true
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(git rev-parse *), Bash(git mv *), Bash(git ls-files *), Bash(ls *), Bash(mkdir -p *), Bash(touch *), Bash(mv *), Bash(rm *), Bash(cp *), Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pia-settings.py" *)
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(git rev-parse *), Bash(git mv *), Bash(git ls-files *), Bash(ls *), Bash(mkdir -p *), Bash(touch *), Bash(mv *), Bash(rm *), Bash(cp *), Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pia-settings.py" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/pia-app.sh" *), Bash(sudo -n -l *)
 ---
 
 # /pia:init
@@ -82,11 +82,16 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pia-settings.py" "<repo root>"
 
 It merges into `.claude/settings.json`: `autoCompactWindow` (from `.pia/config.json`, default 600000 tokens) and `env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = "1"`.
 
-## 6. Report
+## 6. PIA.app (macOS only)
+
+Start building PIA.app in the background (notifications and PIA Awake): `bash "${CLAUDE_PLUGIN_ROOT}/scripts/pia-app.sh" build`. Then check whether PIA Awake is installed: `sudo -n -l /usr/bin/pmset -a disablesleep 1` succeeds only if it is.
+
+## 7. Report
 
 Short, in the human's language:
 - what was created or changed (bullets), including the move from `CLAUDE.md` to `AGENTS.md`;
 - how many rules were imported, if any, and which ones were flagged;
 - **restart Claude Code in this project** so auto-compaction and agent teams take effect;
 - if `claude --version` is below 2.1.278, say that `AGENTS.md` may not be read by Claude Code yet and they should update;
-- next: `/pia:new <your intention>`.
+- if PIA Awake is not installed: one line saying that, to keep the Mac working with the lid closed, they run once in a Terminal window `bash "<the real value of ${CLAUDE_PLUGIN_ROOT}>/scripts/awake-install.sh"` (it asks for their password once; `--uninstall` undoes it);
+- next: `/pia:new <your intention>`, or `/pia:disposable <intention>` for something small that should leave nothing in the repo.
