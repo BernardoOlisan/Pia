@@ -3,7 +3,7 @@ name: new
 description: Start a new PIA work from an intention. Keeps the machine awake, then talks it through with you while a scout investigates in parallel, turns it into a decision map, and builds it.
 argument-hint: "<your intention> [--out-of-the-loop]"
 disable-model-invocation: true
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls *), Bash(mkdir -p *), Bash(date *), Bash(git rev-parse *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/awake.sh" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/next-decision-id.sh" *)
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/decisions.py" *), Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/works.py" *), Bash(ls *), Bash(mkdir -p *), Bash(date *), Bash(git rev-parse *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/awake.sh" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/next-decision-id.sh" *)
 ---
 
 # /pia:new (you are the PIA lead)
@@ -65,7 +65,7 @@ Spawn teammates with the Agent tool, **always passing a `name`** (with agent tea
 > You are the PIA **{role}** for work **{id}** in this repository. Work folder: `.pia/work/{id}/`. Your log: `.pia/work/{id}/logs/{your name}.md` (create it from `${CLAUDE_PLUGIN_ROOT}/templates/work/agent-log.md`). You talk to: {names}, and the lead.
 > First read `.pia/PIA.md` (sections "All agents", "Team", and {your sections}), then `AGENTS.md`, `.pia/DECISIONS.md` as PIA.md says, and the work's `state.json` and `talk.md`. Then do your job exactly as described there. Communicate only with SendMessage.
 > Log only with the log script: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh" .pia/work/{id}/logs/{your name}.md "<what happened>" --doing "<what you're doing now>"`.
-> Templates for work files: `${CLAUDE_PLUGIN_ROOT}/templates/work/`. Decision ID script: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/next-decision-id.sh" <project root> {id} <count>`.
+> Templates for work files: `${CLAUDE_PLUGIN_ROOT}/templates/work/`. Decision ID script: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/next-decision-id.sh" <project root> {id} <count>`. Map bookkeeping (summary line, one card, history, drift): `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/decisions.py"`.
 > {For the scout during the talk: the lead will send you what to look at and direct questions. Answer in two or three lines, never with a document.}
 > {For a replacement or a test-round implementer: this is round {R}. Resume from the files, the `## Now` of `log.md`, and `logs/{previous agent}.md`. The items to fix: …}
 > Never go quiet: message the lead at least every 15 minutes, and check on anything you wait for yourself. Never commit `.pia/`, and never run `git reset --hard`, `git checkout --`, `git clean` or anything else that throws away work you didn't make (PIA.md → All agents 9–10).

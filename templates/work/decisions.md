@@ -1,9 +1,9 @@
 # Decisions: {work title}
 
 **Goal:** {one sentence: what this work builds or fixes, and why}
-**Summary:** {n} 🔴 High · {n} 🟡 Medium · {n} 🟢 Low · {n} decided by you in the talk
+**Summary:** written by `scripts/decisions.py summary`
 
----
+## 🔴 High
 
 ### D-{NNN} · {The question, in plain words?}  🔴 High
 
@@ -16,6 +16,13 @@
 **Area:** {area} · **Depends on:** {D-NNN, … | none} · **Affects:** {what changes if this decision changes}
 **Status:** {agent | human}
 <!-- When this card replaced a question the human never got to answer, add this line under Status:
-     Asked you during the talk; you were away. -->
+     Asked you during the talk; you were away.
+     When the card was added after the talk, add: **Added:** build | round N
+     When the card changes, rewrite it to the current truth; the old text goes to decisions-history.md
+     (scripts/decisions.py history). -->
 
 ---
+
+## 🟡 Medium
+
+## 🟢 Low

@@ -3,7 +3,7 @@ name: out-of-the-loop
 description: Switch a PIA work to out-of-the-loop mode, so it doesn't stop at the decision map and keeps going through plan and implementation (e.g. while you sleep).
 argument-hint: "[work id or number] [--default]"
 disable-model-invocation: true
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls *), Bash(date *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/awake.sh" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh" *)
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/decisions.py" *), Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/works.py" *), Bash(ls *), Bash(date *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/awake.sh" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh" *)
 ---
 
 # /pia:out-of-the-loop

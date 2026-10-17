@@ -3,7 +3,7 @@ name: continue
 description: Resume a PIA work after reviewing its decision map, after a restart, or in a new session. Picks up from state.json and the logs.
 argument-hint: "[work id or number]"
 disable-model-invocation: true
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls *), Bash(mkdir -p *), Bash(date *), Bash(git rev-parse *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/awake.sh" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/next-decision-id.sh" *)
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/decisions.py" *), Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/works.py" *), Bash(ls *), Bash(mkdir -p *), Bash(date *), Bash(git rev-parse *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/awake.sh" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/log.sh" *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/next-decision-id.sh" *)
 ---
 
 # /pia:continue (resume as the PIA lead)

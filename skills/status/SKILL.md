@@ -2,7 +2,7 @@
 name: status
 description: Show where every PIA work in this project stands: phase, mode, decisions by weight, keep-awake, and what's happening now.
 argument-hint: "[work id or number]"
-allowed-tools: Read, Glob, Grep, Bash(ls *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/awake.sh" *)
+allowed-tools: Read, Glob, Grep, Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/decisions.py" *), Bash(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/works.py" *), Bash(ls *), Bash(bash "${CLAUDE_PLUGIN_ROOT}/scripts/awake.sh" *)
 ---
 
 # /pia:status

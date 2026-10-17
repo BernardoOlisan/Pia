@@ -25,7 +25,8 @@ It is owned by the plugin and refreshed by `/pia:init`. Don't edit it by hand. A
     ├── state.json         id, title, mode, phase, round, lead session
     ├── talk.md            👤 the conversation: the intention, what was found, what the human decided
     ├── research.md        🤖 exhaustive research, written while the talk is happening
-    ├── decisions.md       👤 the decision map
+    ├── decisions.md       👤 the decision map: what is decided now, nothing else
+    ├── decisions-history.md 🤖 what changed cards used to say
     ├── log.md             🤖 the lead's summary log, with "## Now" at the top
     ├── logs/<agent>.md    🤖 one log per agent (scout-004.md, scout-reviewer-004.md, …)
     └── caffeinate.pid     temporary, never committed
@@ -172,7 +173,7 @@ Then write `decisions.md`, which is **for the human**. Follow the `decisions.md`
    - 🔴 **High:** hard to undo; changes architecture, data, cost or the experience broadly; or many things depend on it.
    - 🟡 **Medium:** affects one area; undoing it costs some rework.
    - 🟢 **Low:** local; cheap to change later.
-7. **Order** High → Medium → Low. Fill the summary line at the top.
+7. **Order:** every card goes under its weight's heading (`## 🔴 High`, `## 🟡 Medium`, `## 🟢 Low`), including cards added later during the build or a round — never in a section of their own at the end. A card added after the talk says when on its own line: `**Added:** round 3` (or `build`). Then run `python3 "<plugin>/scripts/decisions.py" summary <decisions.md>`, which writes the summary line; never count by hand.
 8. **Each card stands alone, and is short.** Write it for a reader who has read nothing else: a context of at most 3 short sentences, 2 to 4 options with their consequence in one line each, the decision and its reason in one or two sentences, its area, what it depends on and what it affects. Detail that doesn't fit belongs in `research.md`.
 9. Send `READY FOR REVIEW` to the scout reviewer, naming both files.
 10. When approved: make sure every decision has its final line in `DECISIONS.md` (`D-NNN  weight  [area] what was decided · work/<id> · status`, no `⏳` left), then tell the lead `DECISIONS DONE`.
@@ -203,7 +204,7 @@ Loop: reply to the scout with **numbered findings** (each with the evidence you 
 
 The implementer plans its own work. There is no plan document to follow.
 
-1. Read `decisions.md` and `research.md`, and write a **short checklist** under `## Steps` at the top of your own log: one line per step, each naming the decision IDs it implements, e.g. `- [ ] 2 Render the PDF on the server [D-017]`. Keep it to the steps that matter, not every file edit. Every decision must be implemented by some step.
+1. Read `decisions.md` and `research.md` (one card from anywhere in the project: `decisions.py card <project root> D-NNN`), and write a **short checklist** under `## Steps` at the top of your own log: one line per step, each naming the decision IDs it implements, e.g. `- [ ] 2 Render the PDF on the server [D-017]`. Keep it to the steps that matter, not every file edit. Every decision must be implemented by some step.
 2. Build it, checking off each step as you finish it, and running the tests/typecheck for the part you just changed.
 3. **No stops in the middle.** The human may be asleep. If something blocks, decide how to proceed (a decision), log it, and keep going.
 4. **No new decisions quietly.** If a real fork appears that no card covers, decide it, append the card with `Status: agent` and its line in `DECISIONS.md`, and log it so the human sees it in the map.
@@ -253,13 +254,21 @@ A card written by an agent is `agent` until the human has had the chance to see 
 
 ## Changing a decision
 
-When the human changes a decision (by saying so or with `/pia:change`), the lead does it:
+**A card says what is decided now, and nothing else.** A reader who opens it cold must not have to replay a stack of changes to know the current answer. So a change rewrites the card, and the past goes to the work's `decisions-history.md`.
 
-1. Update the card: new decision and reason, `Status: changed`, and one history line: `Was: B (agent) · changed YYYY-MM-DD`.
-2. Update its line in `DECISIONS.md`.
-3. **Find the impact:** cards whose *Depends on* includes it, steps tagged with it in the implementer's checklist, and implemented steps in the logs.
-4. Tell the human the impact as a short list.
-5. If the work is already implemented, the change goes to an implementer as a round of test feedback (Phase 4). In `out-of-the-loop` mode start it; in `in-the-loop` mode wait for the human's go.
+When the human changes a decision (by saying so, with `/pia:change`, or in test feedback), the lead does it:
+
+1. **Keep the past:** `python3 "<plugin>/scripts/decisions.py" history <work folder> D-NNN "<what the card decided before>" "<its old status>" "<why it changed>"`.
+2. **Rewrite the card as if it had always been this way:** the options as they stand now (the new answer among them), `✅ Decided:` with the full current answer and its reason, `**Status:** changed`. No `Was:` lines, no "Changed in round N" paragraphs: those live in the history.
+3. **Its line in `DECISIONS.md`** says the current decision and status in one line. No history in it.
+4. **A card in another work** (an older work's decision that this one overrides): the lead rewrites that card too, with the history in *that* work's `decisions-history.md` and the reason naming this work ("replaced by D-281, work 002"). One card per decision, always current, wherever it lives.
+5. Run `decisions.py summary` on every map you touched.
+6. **Find the impact:** cards whose *Depends on* includes it, steps tagged with it in the implementer's checklist, and implemented steps in the logs. Tell the human the impact as a short list.
+7. If the work is already implemented, the change goes into a round (Phase 4). In `out-of-the-loop` mode start it; in `in-the-loop` mode wait for the human's go.
+
+**Maps from older PIA** carry `Was:` lines and "Changed in test" paragraphs on their cards. When the human asks to tidy one (or before a round that will change many of its cards), the lead has an agent rewrite each changed card into its current truth with the old text moved to `decisions-history.md`, regroup the cards by weight, then runs `decisions.py summary` and `decisions.py check <project root>` until it reports nothing.
+
+`decisions.py check <project root>` also catches what drifts on its own: ⏳ IDs never written, a card and its line disagreeing on status, summaries that no longer add up. The lead runs it when a round closes.
 
 ## Constraints the human changes mid-flight
 
