@@ -17,19 +17,27 @@ const mates = atom({ plugin: 'pia', key: 'mates' } as const, [] as Mate[])
 const collapsed = atom({ plugin: 'pia', key: 'collapsed' } as const, false)
 const spanish = atom({ plugin: 'pia', key: 'spanish' } as const, false)
 
-// The README's owl, drawn by hand at 8×8 so the band stays four rows tall: ears, amber eyes with their
-// pupils, the beak, the light belly, the wing line and the feet. Two pixels per terminal cell: ▀ paints
-// the top one in the foreground and the bottom one behind it; ▄ when only the bottom one is there.
-// The outline is lighter than the README's so it reads on a dark terminal.
+// The README's 16×16 owl. Two pixels per terminal cell: ▀ paints the top one in the foreground and the
+// bottom one behind it; ▄ when only the bottom one is there; a space when neither. A terminal cell holds
+// two colours, so 16×16 is sixteen columns by eight rows. The outline is lighter than the README's so it
+// reads on a dark terminal.
 const OWL = [
-  'DD....DD',
-  'DBBBBBBD',
-  'BEEBBEEB',
-  'BEPBBPEB',
-  'BBBKKBBB',
-  'BLLLLLLB',
-  'BWLLLLWB',
-  '.K....K.',
+  '.DD..........DD.',
+  '.DBD........DBD.',
+  '.DBBDDDDDDDDBBD.',
+  '.DBBBBBBBBBBBBD.',
+  'DBBEEEBBBBEEEBBD',
+  'DBEEEEEBBEEEEEBD',
+  'DBEEPPEBBEPPEEBD',
+  'DBEEPPEBBEPPEEBD',
+  'DBBEEEBKKBEEEBBD',
+  'DBBBBBBKKBBBBBBD',
+  'DBWLLLLLLLLLLWBD',
+  'DBWLLDLLLLDLLWBD',
+  'DBWLLLLLLLLLLWBD',
+  '.DBWLLLLLLLLWBD.',
+  '..DDBBBBBBBBDD..',
+  '....KK....KK....',
 ]
 const PALETTE: Record<string, number> = {
   D: 0x6b6fd6, B: 0x3d3f9e, E: 0xffd166, P: 0x1a1b3a, K: 0xff8c42, L: 0x8d92f0, W: 0x2c2e78,
@@ -51,8 +59,8 @@ function base64(bytes: Uint8Array): string {
   return out
 }
 
-const OWL_COLUMNS = 8
-const OWL_ROWS = 4
+const OWL_COLUMNS = 16
+const OWL_ROWS = 8
 
 function owlCells(): string {
   const words = new Uint32Array(OWL_COLUMNS * OWL_ROWS * 3)
