@@ -81,6 +81,7 @@ The first notification asks macOS for permission; allow it. PIA's notifications 
 | `/pia:transcribe` or **⌥Space** | Just dictation, no PIA: the island records until you click it (or press ⌥Space again), `gpt-transcribe` writes it, and the text is copied to your clipboard. Never reaches Claude. |
 | `/pia:transcribe follow` or **⌥⇧Space** | The same, but this take is **added** to the last one. The clipboard carries everything said since the last fresh take, one blank line between takes. |
 | `/pia:disposable <what you want>` | A **disposable** work: PIA's log, `## Now`, talk and resume-from-anywhere, with no team and **nothing in the repo** (it lives in `~/.pia/disposable/`). For small projects and quick jobs. `drop` deletes it; `adopt` turns it into a normal work. |
+| `/pia:diagram [what]` | Only when you ask: a flow, a sequence, a database schema or a map of the code, always in the same dark look. Agents write the text and PIA draws it; the lead may offer one, and just saying "draw me a diagram" works too. |
 | `/pia:status` | Where every work stands, disposable ones too. |
 | `/pia:continue [work]` | Resume a work after reviewing its decisions, or in a new session. |
 | `/pia:change D-017 <answer>` | Change a decision and see its impact. |
@@ -128,6 +129,7 @@ alias pia-transcribe-reset='pkill -f "pia-voice dictate serve"; rm -f ~/Library/
     ├── decisions.md  👤 what is decided now, by weight
     ├── decisions-history.md  🤖 what changed cards used to say
     ├── log.md        🤖 the lead's summary
+    ├── diagrams/     🤖 the source of each diagram you asked for
     └── logs/         🤖 one log per agent: implementer-003, implementer-003-2-1 (round 2), …
 ```
 

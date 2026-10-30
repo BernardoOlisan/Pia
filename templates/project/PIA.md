@@ -29,6 +29,7 @@ It is owned by the plugin and refreshed by `/pia:init`. Don't edit it by hand. A
     ├── decisions-history.md 🤖 what changed cards used to say
     ├── log.md             🤖 the lead's summary log, with "## Now" at the top
     ├── logs/<agent>.md    🤖 one log per agent (scout-004.md, scout-reviewer-004.md, …)
+    ├── diagrams/<name>/   🤖 the source of each diagram the human asked for (optional)
     └── caffeinate.pid     temporary, never committed
 ```
 
@@ -286,6 +287,12 @@ A **disposable work** (`/pia:disposable`) is PIA for small or short-lived projec
 - Every rule of *All agents* that applies to one agent still applies: the log script, keep-awake, the shared checkout, writing for the human.
 - Its decision IDs are local to the work until it is adopted. `/pia:disposable adopt` turns it into a normal work in `.pia/work/` with project-wide IDs; `/pia:disposable drop` deletes it after the human confirms.
 - `state.json` says `"kind": "disposable"`; its phases are `work`, `test` (rounds, as in Phase 4) and `done`.
+
+## Diagrams
+
+**Optional, and only when the human asks.** No phase produces one and no report waits for one, in either mode. The lead may offer one in a single line when a picture would help, for example at the end of the talk or with the decision map ("Do you want a diagram of how this changes?"). If the human says no or says nothing, it moves on.
+
+Whoever already has the context draws it with the `diagram` skill: the scout during the talk and the decisions, the implementer in a round, or the lead. Never spawn an agent just to draw. The agent writes the source in `<work folder>/diagrams/<name>/`, and PIA's script gives every diagram the same look, always dark. The lead adds the link to `talk.md`.
 
 ## Telling the human
 
