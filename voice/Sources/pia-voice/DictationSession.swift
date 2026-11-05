@@ -1,7 +1,9 @@
 import AppKit
 import Foundation
+import Network
 import PiaVoiceAudio
 import PiaVoiceCore
+import PiaVoiceLocal
 import PiaVoiceNotch
 
 struct DictationOptions {
@@ -28,9 +30,25 @@ enum DictationPaths {
     /// Everything said since the last fresh take, so appending survives a restart of the daemon.
     static let buffer = dir.appendingPathComponent("buffer.txt")
     static let failed = dir.appendingPathComponent("failed")
+    /// Every take, audio and text, named by when it ended: `2026-11-05-093359.m4a` and `.txt`.
+    /// About 360 KB per minute of speech. Deleting the folder loses nothing PIA needs.
+    static let takes = dir.appendingPathComponent("takes")
+    /// The global vocabulary, one term per line, sent with every take (see `Vocabulary`).
+    static let vocabulary = dir.appendingPathComponent("vocabulary.txt")
+    /// While this file exists every take behaves as if there were no network: cyan, transcribed locally.
+    /// For trying the offline path while connected — `touch` it, dictate, `rm` it.
+    static let forceOffline = dir.appendingPathComponent("offline")
+
+    static func stamp(_ date: Date = Date()) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd-HHmmss"
+        return formatter.string(from: date)
+    }
 }
 
-/// Dictation, nothing else: record, transcribe with gpt-transcribe, put the text in the clipboard.
+/// Dictation, nothing else: record, transcribe with gpt-transcribe (or locally with Parakeet when OpenAI
+/// can't be reached), put the text in the clipboard, and keep the take in `takes/`.
 /// One process per Mac, alive while Claude Code is open. Toggled by the global shortcut, by `/pia:transcribe`
 /// (SIGUSR1) or by clicking the island. Runs on the main thread.
 @MainActor
@@ -58,6 +76,12 @@ final class DictationSession {
     private var generation = 0
     private var quitWhenIdle = false
     private var claudeMissing = 0
+    /// Whether the Mac has a network path at all. Without one OpenAI isn't tried: the take goes straight
+    /// to the local model, and the island is cyan while recording so you know.
+    private let network = NWPathMonitor()
+    private var online = true
+    /// Fixed when a take starts: no network then (or `offline` forced), so it goes to the local model.
+    private var takeOffline = false
 
     init(options: DictationOptions) {
         self.options = options
@@ -100,7 +124,13 @@ final class DictationSession {
         Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.watchClaude() }
         }
+        network.pathUpdateHandler = { [weak self] path in
+            let online = path.status == .satisfied
+            DispatchQueue.main.async { MainActor.assumeIsolated { self?.networkChanged(online: online) } }
+        }
+        network.start(queue: .global(qos: .utility))
         log("ready (pid \(getpid()))")
+        prepareLocal()
         if options.recordNow { toggle(appendingTake: options.recordAppending) }
     }
 
@@ -121,7 +151,7 @@ final class DictationSession {
     // MARK: Recording
 
     private func startRecording(appending: Bool = false) {
-        guard Secrets.openAIKey() != nil else {
+        guard Secrets.openAIKey() != nil || LocalTranscriber.isDownloaded else {
             log("no OpenAI API key. Save it with: security add-generic-password -s pia-voice -a openai -w")
             finish(.failed)
             return
@@ -146,6 +176,8 @@ final class DictationSession {
         self.appending = appending
         model.reset()
         model.appending = appending
+        takeOffline = !online || FileManager.default.fileExists(atPath: DictationPaths.forceOffline.path)
+        model.offline = takeOffline
         show(.recording)
         log(appending ? "recording (appending)" : "recording")
     }
@@ -173,38 +205,104 @@ final class DictationSession {
     }
 
     private func transcribe(seconds: Double) async {
-        guard let key = Secrets.openAIKey() else { finish(.failed); return }
-        do {
-            let result = try await Transcription.send(apiKey: key, audioFile: DictationPaths.recording)
-            ledger.add(seconds: result.seconds ?? seconds)
-            ledger.save(DictationPaths.ledger)
-            model.cost = DictationLedger.label(ledger.dollars())
-            let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty else {
-                log("empty transcript")
-                finish(.failed)
-                return
+        let audioFile = DictationPaths.recording
+        var text: String?
+        var engine = "gpt-transcribe"
+        if !takeOffline, online, let key = Secrets.openAIKey() {
+            do {
+                let result = try await Transcription.send(apiKey: key, audioFile: audioFile, context: context(),
+                                                          timeout: Transcription.timeout(forSeconds: seconds))
+                ledger.add(seconds: result.seconds ?? seconds)
+                ledger.save(DictationPaths.ledger)
+                model.cost = DictationLedger.label(ledger.dollars())
+                text = result.text
+            } catch {
+                log("transcription failed: \(String(describing: error).prefix(300)) · trying the local model")
             }
-            // An appending take carries everything said since the last fresh one, so one paste brings
-            // the whole thought. A blank line between takes: you are stitching thoughts, not sentences.
-            let clipboard = appending
-                ? DictationBuffer.joined(previous: DictationBuffer.read(DictationPaths.buffer), take: text)
-                : text
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(clipboard, forType: .string)
-            try? clipboard.write(to: DictationPaths.buffer, atomically: true, encoding: .utf8)
-            try? text.write(to: DictationPaths.last, atomically: true, encoding: .utf8)
-            log(String(format: "copied %d characters%@ · %.0fs · this month %@",
-                       clipboard.count, appending ? " (appended)" : "", seconds, model.cost))
-            finish(.done)
-        } catch {
-            try? FileManager.default.createDirectory(at: DictationPaths.failed, withIntermediateDirectories: true)
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd-HHmmss"
-            let kept = DictationPaths.failed.appendingPathComponent(formatter.string(from: Date()) + ".m4a")
-            try? FileManager.default.moveItem(at: DictationPaths.recording, to: kept)
-            log("transcription failed: \(error) · audio kept in \(kept.path)")
+        }
+        if text == nil {
+            engine = "parakeet (local)"
+            model.offline = true
+            do {
+                text = try await LocalTranscriber.shared.transcribe(audioFile)
+            } catch {
+                log("local transcription failed: \(error)")
+            }
+        }
+        guard let text = text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
+            keepFailed()
             finish(.failed)
+            return
+        }
+        // An appending take carries everything said since the last fresh one, so one paste brings
+        // the whole thought. A blank line between takes: you are stitching thoughts, not sentences.
+        let clipboard = appending
+            ? DictationBuffer.joined(previous: DictationBuffer.read(DictationPaths.buffer), take: text)
+            : text
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(clipboard, forType: .string)
+        try? clipboard.write(to: DictationPaths.buffer, atomically: true, encoding: .utf8)
+        try? text.write(to: DictationPaths.last, atomically: true, encoding: .utf8)
+        keepTake(text: text)
+        log(String(format: "copied %d characters%@ · %.0fs · %@ · this month %@",
+                   clipboard.count, appending ? " (appended)" : "", seconds, engine, model.cost))
+        finish(.done)
+    }
+
+    private func networkChanged(online: Bool) {
+        guard online != self.online else { return }
+        self.online = online
+        log(online ? "network back" : "no network · takes are transcribed on this Mac")
+        if state == .recording, !online {
+            takeOffline = true
+            model.offline = true
+        }
+        if online { prepareLocal() }
+    }
+
+    /// The hints for this take: the global vocabulary, read again each time so an edit applies at once.
+    private func context() -> Transcription.Context {
+        var context = Transcription.Context()
+        if let terms = Vocabulary.load(DictationPaths.vocabulary) {
+            if terms.count > Vocabulary.limit {
+                log("vocabulary has \(terms.count) terms; only the first \(Vocabulary.limit) are sent")
+            }
+            context.keywords = Array(terms.prefix(Vocabulary.limit))
+        }
+        return context
+    }
+
+    /// The take's audio and its own text (not the appended clipboard), side by side in `takes/`.
+    private func keepTake(text: String) {
+        let base = DictationPaths.takes.appendingPathComponent(DictationPaths.stamp())
+        do {
+            try FileManager.default.createDirectory(at: DictationPaths.takes, withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: DictationPaths.recording, to: base.appendingPathExtension("m4a"))
+            try text.write(to: base.appendingPathExtension("txt"), atomically: true, encoding: .utf8)
+        } catch {
+            log("take not kept: \(error)")
+        }
+    }
+
+    /// Neither OpenAI nor the local model gave text: the audio is kept so nothing said is lost.
+    private func keepFailed() {
+        try? FileManager.default.createDirectory(at: DictationPaths.failed, withIntermediateDirectories: true)
+        let kept = DictationPaths.failed.appendingPathComponent(DictationPaths.stamp() + ".m4a")
+        try? FileManager.default.moveItem(at: DictationPaths.recording, to: kept)
+        log("no transcript · audio kept in \(kept.path)")
+    }
+
+    /// Download Parakeet once, in the background, so a take without network finds it on disk.
+    private func prepareLocal() {
+        guard !LocalTranscriber.isDownloaded else { return }
+        log("downloading the local model (~480 MB, once) into \(LocalTranscriber.modelDirectory.path)")
+        Task.detached(priority: .utility) {
+            do {
+                try await LocalTranscriber.shared.ensureDownloaded()
+                await MainActor.run { self.log("local model downloaded") }
+            } catch {
+                await MainActor.run { self.log("local model not downloaded (will try again next launch): \(error)") }
+            }
         }
     }
 

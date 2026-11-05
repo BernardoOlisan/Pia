@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import PiaVoiceCore
+import PiaVoiceLocal
 import PiaVoiceNotch
 
 @main
@@ -8,10 +9,11 @@ enum PiaVoiceMain {
     static let usage = """
     usage: pia-voice dictate toggle [--append] | ensure | stop
            pia-voice dictate serve [--record [--append]] [--hotkey <keys>|off] [--stay]
-           pia-voice transcribe <audio file>
+           pia-voice transcribe [--local] <audio file>
            pia-voice notch demo [--capsule|--notch] [--cycle] [--append]
 
-    dictate: record, transcribe with gpt-transcribe, copy the text to the clipboard.
+    dictate: record, transcribe with gpt-transcribe, copy the text to the clipboard. Without network it
+    falls back to Parakeet on this Mac. Every take is kept in ~/Library/Application Support/PIA Voice/takes/.
 
       toggle                 start or stop a dictation (starts the dictation process if needed)
         --append             this take is added to the last one instead of replacing it, so the
@@ -26,6 +28,7 @@ enum PiaVoiceMain {
         --stay               keep running when no Claude Code is open
 
     transcribe: transcribe one audio file with gpt-transcribe and print the text (for testing).
+      --local                with Parakeet on this Mac instead (downloads the model the first time)
 
     notch demo: the island with a fake voice — no microphone, no API key, nothing billed. For judging
     the shape, the motion and whether it follows you across Spaces and screens.
@@ -105,17 +108,30 @@ enum PiaVoiceMain {
 
     // MARK: transcribe
 
-    static func runTranscribe(_ args: [String]) {
+    static func runTranscribe(_ arguments: [String]) {
+        var args = arguments
+        let local = args.first == "--local"
+        if local { args.removeFirst() }
         guard let path = args.first else { fail(usage) }
-        guard let key = Secrets.openAIKey() else { fail("no OpenAI API key. Save it with: security add-generic-password -s pia-voice -a openai -w") }
+        let file = URL(fileURLWithPath: path)
         let done = DispatchSemaphore(value: 0)
         var status: Int32 = 0
         Task {
             do {
-                let result = try await Transcription.send(apiKey: key, audioFile: URL(fileURLWithPath: path))
-                print(result.text)
-                if let seconds = result.seconds {
-                    FileHandle.standardError.write("\(seconds)s · \(DictationLedger.label(seconds / 60 * Transcription.dollarsPerMinute))\n".data(using: .utf8)!)
+                if local {
+                    let started = Date()
+                    try await LocalTranscriber.shared.ensureDownloaded()
+                    print(try await LocalTranscriber.shared.transcribe(file))
+                    FileHandle.standardError.write(String(format: "parakeet (local) · %.2fs\n", Date().timeIntervalSince(started)).data(using: .utf8)!)
+                } else {
+                    guard let key = Secrets.openAIKey() else { fail("no OpenAI API key. Save it with: security add-generic-password -s pia-voice -a openai -w") }
+                    var context = Transcription.Context()
+                    if let terms = Vocabulary.load(DictationPaths.vocabulary) { context.keywords = Array(terms.prefix(Vocabulary.limit)) }
+                    let result = try await Transcription.send(apiKey: key, audioFile: file, context: context)
+                    print(result.text)
+                    if let seconds = result.seconds {
+                        FileHandle.standardError.write("\(seconds)s · \(DictationLedger.label(seconds / 60 * Transcription.dollarsPerMinute))\n".data(using: .utf8)!)
+                    }
                 }
             } catch {
                 FileHandle.standardError.write("pia-voice: \(error)\n".data(using: .utf8)!)

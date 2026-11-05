@@ -20,6 +20,10 @@ public final class DictationModel {
     public var appending = false
     /// The last couple of seconds of loudness, oldest first.
     public var samples: [Float] = []
+    /// No network: this take will be transcribed on this Mac, and the island is cyan instead of red.
+    public var offline = false
+    /// Red while recording, cyan when offline.
+    public var accent: Color { offline ? Palette.cyan : Palette.red }
     /// One click stops the recording.
     public var onTap: (() -> Void)?
 
@@ -40,11 +44,13 @@ public final class DictationModel {
         elapsed = 0
         showCost = false
         appending = false
+        offline = false
     }
 }
 
 /// The dictation island, drawn the way Voice Memos draws a recording: the live waveform on one side of
-/// the notch, the elapsed time on the other, both in red. The cost is not shown unless you ask for it.
+/// the notch, the elapsed time on the other, both in red — cyan when there is no network and the take is
+/// transcribed on this Mac. The cost is not shown unless you ask for it.
 public struct DictationView: View {
     @Bindable var model: DictationModel
     var stage: IslandStage
@@ -146,7 +152,7 @@ public struct DictationView: View {
                     .transition(.opacity.combined(with: .move(edge: .trailing)))
             }
             if model.phase == .recording {
-                Waveform(samples: model.samples, color: Palette.red)
+                Waveform(samples: model.samples, color: model.accent)
                     .frame(width: Self.slotWidth, height: geometry.waveHeight)
                     .transition(.opacity.combined(with: .scale(scale: 0.7, anchor: .leading)))
             } else {
@@ -166,7 +172,7 @@ public struct DictationView: View {
                     if appendingVisible {
                         Text("+")
                             .font(.system(size: 11.5, weight: .regular, design: .rounded))
-                            .foregroundStyle(Palette.red)
+                            .foregroundStyle(model.accent)
                             .fixedSize()
                             // Centring two text views centres their boxes, not their ink. A "+" is drawn
                             // on the font's math axis and digits on the baseline, so the boxes line up
@@ -175,11 +181,11 @@ public struct DictationView: View {
                             .offset(y: -1)
                             .transition(.opacity.combined(with: .scale(scale: 0.6, anchor: .trailing)))
                     }
-                    ElapsedLabel(seconds: model.elapsed)
+                    ElapsedLabel(seconds: model.elapsed, color: model.accent)
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.7)))
             case .transcribing:
-                Spinner().transition(.opacity.combined(with: .scale(scale: 0.5)))
+                Spinner(color: model.offline ? Palette.cyan : .white).transition(.opacity.combined(with: .scale(scale: 0.5)))
             case .done:
                 Image(systemName: "checkmark")
                     .font(.system(size: 10, weight: .heavy))

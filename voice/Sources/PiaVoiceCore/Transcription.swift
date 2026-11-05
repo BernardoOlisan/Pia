@@ -40,9 +40,16 @@ public enum Transcription {
         }
     }
 
-    public static func request(apiKey: String, audio: Data, filename: String, context: Context = Context()) -> URLRequest {
+    /// How long to wait without hearing from OpenAI before giving up — and, in dictation, falling back to
+    /// the local model. Short for short takes, so a dead connection doesn't hold the text for three minutes.
+    public static func timeout(forSeconds seconds: Double) -> TimeInterval {
+        min(180, max(30, 15 + seconds / 10))
+    }
+
+    public static func request(apiKey: String, audio: Data, filename: String, context: Context = Context(),
+                               timeout: TimeInterval = 180) -> URLRequest {
         let boundary = "pia-" + UUID().uuidString
-        var request = URLRequest(url: url, timeoutInterval: 180)
+        var request = URLRequest(url: url, timeoutInterval: timeout)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
@@ -76,9 +83,10 @@ public enum Transcription {
         return Result(text: text, seconds: seconds)
     }
 
-    public static func send(apiKey: String, audioFile: URL, context: Context = Context()) async throws -> Result {
+    public static func send(apiKey: String, audioFile: URL, context: Context = Context(),
+                            timeout: TimeInterval = 180) async throws -> Result {
         let audio = try Data(contentsOf: audioFile)
-        let (data, response) = try await URLSession.shared.data(for: request(apiKey: apiKey, audio: audio, filename: audioFile.lastPathComponent, context: context))
+        let (data, response) = try await URLSession.shared.data(for: request(apiKey: apiKey, audio: audio, filename: audioFile.lastPathComponent, context: context, timeout: timeout))
         let body = String(data: data, encoding: .utf8) ?? ""
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard status == 200 else { throw Failure.http(status, body) }

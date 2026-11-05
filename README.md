@@ -96,6 +96,9 @@ While you dictate, the island in the notch draws what Voice Memos draws: the liv
 - **One click** stops the take. So does ⌥Space.
 - **Two clicks** show this month's cost beside the waveform, as a quiet white hint; two more hide it again. It is hidden by default.
 - **A `+` beside the clock** means this take is being added to what you already said (⌥⇧Space).
+- **Cyan instead of red** means there is no network: the take is transcribed on the Mac with Parakeet, offline.
+
+Every take is kept, audio and text, in `~/Library/Application Support/PIA Voice/takes/` (about 40 MB a week); delete the folder whenever you want the space back. The words the transcriber should know — your projects, people, tools — go in `vocabulary.txt` in that same folder. Details in [voice/README.md](voice/README.md).
 
 ### Composing one prompt out of several takes
 

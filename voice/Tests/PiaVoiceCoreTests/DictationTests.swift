@@ -109,3 +109,27 @@ final class AppendHotkeyTests: XCTestCase {
         XCTAssertEqual(append?.modifiers, 4096 | 256 | 512)
     }
 }
+
+final class VocabularyTests: XCTestCase {
+    func testParse() {
+        let text = """
+        # projects
+        quizpeek
+          Claude   Code  # spaces collapse
+        QUIZPEEK
+        <bad>term
+
+        """
+        XCTAssertEqual(Vocabulary.parse(text), ["quizpeek", "Claude Code", "badterm"])
+    }
+
+    func testMissingFile() {
+        XCTAssertNil(Vocabulary.load(URL(fileURLWithPath: "/nonexistent/vocabulary.txt")))
+    }
+
+    func testTimeout() {
+        XCTAssertEqual(Transcription.timeout(forSeconds: 34), 30)
+        XCTAssertEqual(Transcription.timeout(forSeconds: 600), 75)
+        XCTAssertEqual(Transcription.timeout(forSeconds: 1800), 180)
+    }
+}
